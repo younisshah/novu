@@ -7,7 +7,7 @@ export class EmailHandler {
   constructor(
     private message: IMessage,
     private provider: IEmailProvider,
-    private theme: ITheme
+    private theme?: ITheme
   ) {}
 
   async send(data: ITriggerPayload) {
