@@ -1,41 +1,19 @@
 import { compileTemplate } from '../content/content.engine';
 import { IEmailProvider } from '../provider/provider.interface';
 import { IMessage, ITriggerPayload } from '../template/template.interface';
-import { ITheme } from '../theme/theme.interface';
 
 export class EmailHandler {
-  constructor(
-    private message: IMessage,
-    private provider: IEmailProvider,
-    private theme: ITheme
-  ) {}
+  constructor(private message: IMessage, private provider: IEmailProvider) {
+  }
 
   async send(data: ITriggerPayload) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const branding: any = data?.$branding || {};
-
-    const templatePayload = {
-      $branding: branding,
-      ...data,
-    };
-
-    let html = compileTemplate(this.message.template, templatePayload);
+    const html = compileTemplate(this.message.template, data);
     const subject = compileTemplate(this.message.subject || '', data);
-
-    if (this.theme?.emailTemplate?.getEmailLayout()) {
-      const themeVariables = this.theme?.emailTemplate?.getTemplateVariables() || {};
-
-      html = compileTemplate(this.theme?.emailTemplate?.getEmailLayout(), {
-        ...templatePayload,
-        ...themeVariables,
-        body: html,
-      });
-    }
 
     await this.provider.sendMessage({
       to: data.$email,
       subject,
-      html,
+      html
     });
   }
 }

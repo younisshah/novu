@@ -10,7 +10,6 @@ export function compileTemplate(
     [key: string]:
       | string
       | { key: string }[]
-      | { key: string | number }
       | string[]
       | number[]
       | boolean
