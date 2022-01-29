@@ -6,7 +6,7 @@ notion_page_id: b34ab7edac334e6f9a5fe457cae3c530
 
 In this guide, we will explore Relayed mono-repo structure and high-level structure of the different libraries and services we have.
 
-![https://miro.com/app/board/uXjVOUZtmvY=/](https://s3.us-west-2.amazonaws.com/secure.notion-static.com/e880ab15-eae1-4069-905a-0c4bca310d58/Mono-repo_Structure.jpeg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIAT73L2G45EIPT3X45%2F20220129%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20220129T102327Z&X-Amz-Expires=3600&X-Amz-Signature=d9a9b5c24d31e3d3eb7d5b592c0e8ce2c5b0f09a72d308a82d67106b8a9c7d1c&X-Amz-SignedHeaders=host&x-id=GetObject)
+![https://miro.com/app/board/uXjVOUZtmvY=/](https://s3.us-west-2.amazonaws.com/secure.notion-static.com/e880ab15-eae1-4069-905a-0c4bca310d58/Mono-repo_Structure.jpeg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIAT73L2G45EIPT3X45%2F20220129%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20220129T102517Z&X-Amz-Expires=3600&X-Amz-Signature=a508e7a0a3bf1b4b494eb0f1e1d09dda16f70ff98cd3cfa35a7f64f1204971c7&X-Amz-SignedHeaders=host&x-id=GetObject)
 
 # Apps
 
@@ -58,7 +58,7 @@ A standalone Node.js library is used to consolidate all communication providers 
 
 ## Nest
 
-A Nest.js  wrapper around the `@notifire/core` package created by the community to easily interact with the core library from a nest project. Also released on NPM as a package.
+A Nest.js  wrapper around the `@notifire/core` package created by the community to easily interact with the core library from a nest project. Also released on NPM as a package
 
 # Providers
 
@@ -74,4 +74,4 @@ These are the API wrappers created by the community to wrap communication provid
 
 - Direct (Slack, MS Teams, Whatsapp, etc...)
 
-Providers can be consumed directly or using the `core` library for a unified API. Test
+Providers can be consumed directly or using the `core` library for a unified API.
