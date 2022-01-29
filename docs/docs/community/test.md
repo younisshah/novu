@@ -6,7 +6,7 @@ notion_page_id: b34ab7edac334e6f9a5fe457cae3c530
 
 In this guide, we will explore Relayed mono-repo structure and high-level structure of the different libraries and services we have.
 
-![https://miro.com/app/board/uXjVOUZtmvY=/](https://s3.us-west-2.amazonaws.com/secure.notion-static.com/e880ab15-eae1-4069-905a-0c4bca310d58/Mono-repo_Structure.jpeg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIAT73L2G45EIPT3X45%2F20220129%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20220129T100936Z&X-Amz-Expires=3600&X-Amz-Signature=b97f29b64276b0055835bed0f92656190f92696fa28008fc50f0ec89e7c35862&X-Amz-SignedHeaders=host&x-id=GetObject)
+![https://miro.com/app/board/uXjVOUZtmvY=/](https://s3.us-west-2.amazonaws.com/secure.notion-static.com/e880ab15-eae1-4069-905a-0c4bca310d58/Mono-repo_Structure.jpeg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIAT73L2G45EIPT3X45%2F20220129%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20220129T102155Z&X-Amz-Expires=3600&X-Amz-Signature=37e66680a56870d917e3578e56bec9eb0b915f2aa6e4177e9c742feac91b7ee2&X-Amz-SignedHeaders=host&x-id=GetObject)
 
 # Apps
 
