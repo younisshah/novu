@@ -66,7 +66,7 @@ export function FlowEditor({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance>();
-  const { setViewport } = useReactFlow();
+  const { setViewport, getViewport } = useReactFlow();
   const { readonly } = useEnvController();
 
   useEffect(() => {
@@ -75,6 +75,7 @@ export function FlowEditor({
       const middle = clientWidth ? clientWidth / 2 - 100 : 0;
       const zoomView = nodes.length > 4 ? 0.75 : 1;
       const xyPos = reactFlowInstance?.project({ x: middle, y: 0 });
+      console.log('get effect', getViewport());
       setViewport({ x: xyPos?.x ?? 0, y: xyPos?.y ?? 0, zoom: zoomView }, { duration: 800 });
     }
   }, [reactFlowInstance]);
@@ -234,6 +235,25 @@ export function FlowEditor({
     [reactFlowInstance, nodes, edges]
   );
 
+  const handleFitView = useCallback(() => {
+    // setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 800 });
+    const viewport = getViewport();
+    console.log('get viewport', viewport);
+    const clientWidth = reactFlowWrapper.current?.clientWidth;
+    // reactFlowInstance?.fitBounds({ x: 0, y: 0, width: clientWidth ? clientWidth : 500, height: 500 });
+    const middle = clientWidth ? clientWidth / 2 - 100 : 0;
+    console.log('middle', middle);
+    const zoomView = nodes.length > 4 ? 0.75 : 1;
+    const xyPos = reactFlowInstance?.project({ x: middle, y: 0 });
+
+    console.log('get xyPos', xyPos);
+    console.log('get viewport', viewport);
+    console.log('get viewport now', getViewport());
+    // setViewport({ x: xyPos?.x ?? 0, y: 0, zoom: zoomView }, { duration: 800 });
+
+    // setViewport({ x: viewport.x, y: 0, zoom: zoomView }, { duration: 800 });
+  }, [reactFlowInstance]);
+
   return (
     <Wrapper dark={colorScheme === 'dark'}>
       <div style={{ height: '500px', width: 'inherit' }} ref={reactFlowWrapper}>
@@ -249,7 +269,7 @@ export function FlowEditor({
           onNodeClick={onNodeClick}
           {...reactFlowDefaultProps}
         >
-          <Controls />
+          <Controls onFitView={handleFitView} />
           <Background
             size={1}
             gap={10}
