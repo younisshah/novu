@@ -1,20 +1,27 @@
-import { ApiExtraModels, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ButtonTypeEnum, ChannelCTATypeEnum, ChannelTypeEnum, MessageActionStatusEnum } from '@novu/shared';
+import { ApiExtraModels, ApiProperty, ApiPropertyOptional, getSchemaPath } from '@nestjs/swagger';
+import {
+  ButtonTypeEnum,
+  ChannelCTATypeEnum,
+  ChannelTypeEnum,
+  EmailBlockTypeEnum,
+  MessageActionStatusEnum,
+  TextAlignEnum,
+} from '@novu/shared';
 import { SubscriberResponseDto } from '../../subscribers/dtos';
-import { NotificationTemplateResponse } from '../../notification-template/dto/notification-template-response.dto';
+import { WorkflowResponse } from '../../workflows/dto/workflow-response.dto';
 
 class EmailBlockStyles {
   @ApiProperty({
     enum: ['left', 'right', 'center'],
   })
-  textAlign?: 'left' | 'right' | 'center';
+  textAlign?: TextAlignEnum;
 }
 
 class EmailBlock {
   @ApiProperty({
     enum: ['text', 'button'],
   })
-  type: 'text' | 'button';
+  type: EmailBlockTypeEnum;
   @ApiProperty()
   content: string;
   @ApiPropertyOptional()
@@ -50,14 +57,17 @@ class MessageAction {
     enum: MessageActionStatusEnum,
   })
   status?: MessageActionStatusEnum;
+
   @ApiPropertyOptional({
     type: MessageButton,
+    isArray: true,
   })
   buttons?: MessageButton[];
-  @ApiProperty({
+
+  @ApiPropertyOptional({
     type: MessageActionResult,
   })
-  result: MessageActionResult;
+  result?: MessageActionResult;
 }
 
 class MessageCTAData {
@@ -66,8 +76,8 @@ class MessageCTAData {
 }
 
 class MessageCTA {
-  @ApiProperty()
-  type: ChannelCTATypeEnum;
+  @ApiPropertyOptional()
+  type?: ChannelCTATypeEnum;
   @ApiProperty()
   data: MessageCTAData;
   @ApiPropertyOptional()
@@ -103,9 +113,9 @@ export class MessageResponseDto {
   subscriber?: SubscriberResponseDto;
 
   @ApiPropertyOptional({
-    type: NotificationTemplateResponse,
+    type: WorkflowResponse,
   })
-  template?: NotificationTemplateResponse;
+  template?: WorkflowResponse;
 
   @ApiPropertyOptional()
   templateIdentifier?: string;
@@ -116,7 +126,7 @@ export class MessageResponseDto {
   @ApiProperty({
     oneOf: [
       {
-        type: '[EmailBlock]',
+        $ref: getSchemaPath(EmailBlock),
       },
       {
         type: 'string',
@@ -128,6 +138,7 @@ export class MessageResponseDto {
   @ApiProperty()
   transactionId: string;
 
+  @ApiProperty()
   subject?: string;
 
   @ApiProperty({
@@ -165,7 +176,7 @@ export class MessageResponseDto {
   cta: MessageCTA;
 
   @ApiProperty()
-  _feedId: string;
+  _feedId?: string;
 
   @ApiProperty({
     enum: ['sent', 'error', 'warning'],
@@ -187,4 +198,21 @@ export class MessageResponseDto {
     description: 'Provider specific overrides used when triggering the notification',
   })
   overrides: Record<string, unknown>;
+}
+
+export class MessagesResponseDto {
+  @ApiPropertyOptional()
+  totalCount?: number;
+
+  @ApiProperty()
+  hasMore: boolean;
+
+  @ApiProperty()
+  data: MessageResponseDto[];
+
+  @ApiProperty()
+  pageSize: number;
+
+  @ApiProperty()
+  page: number;
 }

@@ -1,8 +1,11 @@
-import { UpdateMessageTemplate } from './update-message-template/update-message-template.usecase';
-import { CreateMessageTemplate } from './create-message-template/create-message-template.usecase';
+import { CreateMessageTemplate, DeleteMessageTemplate, UpdateMessageTemplate } from '@novu/application-generic';
 
+import { FindMessageTemplatesByLayoutUseCase } from './find-message-templates-by-layout/find-message-templates-by-layout.use-case';
+
+export * from './find-message-templates-by-layout';
 export const USE_CASES = [
-  UpdateMessageTemplate,
   CreateMessageTemplate,
-  //
+  FindMessageTemplatesByLayoutUseCase,
+  UpdateMessageTemplate,
+  DeleteMessageTemplate,
 ];

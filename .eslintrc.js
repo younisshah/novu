@@ -4,11 +4,11 @@ module.exports = {
     'airbnb-typescript',
     'plugin:import/typescript',
     'plugin:@typescript-eslint/recommended',
-    'prettier/@typescript-eslint',
+    'prettier',
     'plugin:prettier/recommended',
     'plugin:promise/recommended',
   ],
-  ignorePatterns: ['.eslintrc.js', '*.json', 'jest.config.js'],
+  ignorePatterns: ['.eslintrc.js', '*.json', 'jest.config.js', 'jest.setup.js'],
   plugins: ['import', 'promise', '@typescript-eslint', 'prettier'],
   parser: '@typescript-eslint/parser',
   settings: {
@@ -20,13 +20,14 @@ module.exports = {
     project: './tsconfig.json',
     ecmaVersion: 2020,
     sourceType: 'module',
+    tsconfigRootDir: __dirname,
   },
   rules: {
     '@typescript-eslint/space-before-blocks': 'off',
     '@typescript-eslint/lines-between-class-members': 'off',
     'react/jsx-wrap-multilines': 'off',
     'react/jsx-filename-extension': 'off',
-    'multiline-comment-style': ['error', 'starred-block'],
+    'multiline-comment-style': ['warn', 'starred-block'],
     'promise/catch-or-return': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-unused-expressions': 'off',
@@ -59,10 +60,19 @@ module.exports = {
     'react/react-in-jsx-scope': 'off',
     'max-len': ['warn', { code: 140 }],
     '@typescript-eslint/return-await': 'off',
+    '@typescript-eslint/no-base-to-string': 'error',
     'no-restricted-imports': [
       'error',
       {
-        patterns: ['@novu/shared/*', '@novu/dal/*', '!import2/good'],
+        patterns: [
+          '@novu/shared/*',
+          '!@novu/shared/utils',
+          '@novu/dal/*',
+          '!import2/good',
+          '*../libs/dal/*',
+          '*../libs/shared/*',
+          '*../libs/stateless/*',
+        ],
       },
     ],
     'padding-line-between-statements': [
@@ -88,6 +98,12 @@ module.exports = {
         selector: ['function'],
         format: ['camelCase'],
         leadingUnderscore: 'allow',
+      },
+    ],
+    'prettier/prettier': [
+      'error',
+      {
+        endOfLine: 'auto',
       },
     ],
   },

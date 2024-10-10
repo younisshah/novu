@@ -1,100 +1,213 @@
-import { Navbar, Popover, useMantineColorScheme } from '@mantine/core';
-import { colors, NavMenu, SegmentedControl, shadows } from '../../../design-system';
-import { Activity, Bolt, Box, Settings, Team, Repeat, CheckCircleOutlined } from '../../../design-system/icons';
-import { ChangesCountBadge } from '../../changes/ChangesCountBadge';
-import { useEnvController } from '../../../store/use-env-controller';
-import React, { useContext, useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../../store/authContext';
 import styled from '@emotion/styled';
+import {
+  CloseButton,
+  CloseButtonProps,
+  createPolymorphicComponent,
+  createStyles,
+  Navbar,
+  Popover,
+  useMantineColorScheme,
+} from '@mantine/core';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+
+import {
+  Activity,
+  Bolt,
+  Box,
+  Brand,
+  Buildings,
+  CheckCircleOutlined,
+  colors,
+  IconViewQuilt,
+  NavMenu,
+  NovuLogo,
+  Repeat,
+  SegmentedControl,
+  Settings,
+  shadows,
+  Team,
+  Translation,
+} from '@novu/design-system';
+import { FeatureFlagsKeysEnum, UTM_CAMPAIGN_QUERY_PARAM } from '@novu/shared';
+import { FreeTrialSidebarWidget } from './FreeTrialSidebarWidget';
+import { useUserOnboardingStatus } from '../../../api/hooks/useUserOnboardingStatus';
+import { ROUTES } from '../../../constants/routes.enum';
+import { useEnvController, useFeatureFlag } from '../../../hooks';
+import { useSegment } from '../../providers/SegmentProvider';
+import { useSpotlightContext } from '../../providers/SpotlightProvider';
+import { ChangesCountBadge } from './ChangesCountBadge';
+import OrganizationSelect from '../../nav/OrganizationSelect/OrganizationSelect';
+import { VisibilityOff } from './VisibilityOff';
+import { IS_DOCKER_HOSTED } from '../../../config';
+
+const usePopoverStyles = createStyles(({ colorScheme }) => ({
+  dropdown: {
+    padding: '12px 20px 14px 15px',
+    backgroundColor: colorScheme === 'dark' ? colors.B20 : colors.white,
+    position: 'absolute',
+    color: colorScheme === 'dark' ? colors.white : colors.B40,
+    border: 'none',
+    marginTop: '1px',
+  },
+  arrow: {
+    backgroundColor: colorScheme === 'dark' ? colors.B20 : colors.white,
+    height: '7px',
+    border: 'none',
+    margin: '0px',
+  },
+}));
 
 type Props = {};
 
+/** @deprecated Use `MainNav` instead */
 export function SideNav({}: Props) {
   const navigate = useNavigate();
-  const { setEnvironment, isLoading, environment, readonly } = useEnvController();
-  const { currentUser } = useContext(AuthContext);
-  const location = useLocation();
-  const [opened, setOpened] = useState(readonly);
+  const segment = useSegment();
+  const [opened, setOpened] = useState(false);
+  const { setEnvironment, isLoading, environment, readonly } = useEnvController({
+    onSuccess: (newEnvironment) => {
+      setOpened(!!newEnvironment?._parentId);
+    },
+  });
   const { colorScheme } = useMantineColorScheme();
   const dark = colorScheme === 'dark';
+  const { addItem, removeItems } = useSpotlightContext();
+  const { classes } = usePopoverStyles();
+  const {
+    showOnboarding: showOnBoardingState,
+    isLoading: isLoadingShowOnBoarding,
+    updateOnboardingStatus,
+  } = useUserOnboardingStatus();
+  const showOnBoarding = isLoadingShowOnBoarding ? false : showOnBoardingState;
+  const isInformationArchitectureEnabled = useFeatureFlag(FeatureFlagsKeysEnum.IS_INFORMATION_ARCHITECTURE_ENABLED);
 
   useEffect(() => {
-    setOpened(readonly);
-    if (readonly && location.pathname === '/changes') {
-      navigate('/');
-    }
-  }, [readonly]);
+    removeItems(['toggle-environment']);
+
+    addItem([
+      {
+        id: 'toggle-environment',
+        title: `Toggle to ${environment?.name === 'Production' ? 'Development' : 'Production'} environment`,
+        onTrigger: () => {
+          setEnvironment(environment?.name === 'Production' ? 'Development' : 'Production');
+        },
+      },
+    ]);
+  }, [environment, addItem, removeItems, setEnvironment]);
+
+  const handleHideOnboardingClick = async () => {
+    segment.track('Click Hide Get Started Page - [Get Started]');
+    await updateOnboardingStatus({ showOnboarding: false });
+  };
 
   const menuItems = [
     {
-      condition: !readonly && currentUser?.showOnBoarding,
+      label: 'Get Started',
+      condition: !readonly && showOnBoarding,
       icon: <CheckCircleOutlined />,
-      link: '/quickstart',
-      label: 'Getting Started',
+      link: ROUTES.GET_STARTED,
+      rightSide: { component: <VisibilityOff onClick={handleHideOnboardingClick} />, displayOnHover: true },
       testId: 'side-nav-quickstart-link',
+      tooltipLabel: 'Hide this page from menu',
     },
-    { icon: <Bolt />, link: '/templates', label: 'Notifications', testId: 'side-nav-templates-link' },
-    { icon: <Activity />, link: '/activities', label: 'Activity Feed', testId: 'side-nav-activities-link' },
-    { icon: <Box />, link: '/integrations', label: 'Integrations Store', testId: 'side-nav-integrations-link' },
-    { icon: <Settings />, link: '/settings', label: 'Settings', testId: 'side-nav-settings-link' },
+    { icon: <Bolt />, link: ROUTES.WORKFLOWS, label: 'Workflows', testId: 'side-nav-templates-link' },
     {
+      label: 'Tenants',
+      icon: <Buildings />,
+      link: ROUTES.TENANTS,
+      testId: 'side-nav-tenants-link',
+    },
+    {
+      label: 'Subscribers',
       icon: <Team />,
-      link: '/team',
+      link: ROUTES.SUBSCRIBERS,
+      testId: 'side-nav-subscribers-link',
+    },
+    {
+      label: 'Translations',
+      condition: !IS_DOCKER_HOSTED,
+      icon: <Translation width={20} height={20} />,
+      link: ROUTES.TRANSLATIONS,
+      testId: 'side-nav-translations-link',
+    },
+    {
+      label: 'Brand',
+      condition: !isInformationArchitectureEnabled,
+      icon: <Brand />,
+      link: '/brand',
+      testId: 'side-nav-brand-link',
+    },
+    { icon: <Activity />, link: ROUTES.ACTIVITIES, label: 'Activity Feed', testId: 'side-nav-activities-link' },
+    { icon: <Box />, link: ROUTES.INTEGRATIONS, label: 'Integrations Store', testId: 'side-nav-integrations-link' },
+    {
       label: 'Team Members',
+      condition: !isInformationArchitectureEnabled,
+      icon: <Team />,
+      link: ROUTES.TEAM,
       testId: 'side-nav-settings-organization',
     },
     {
-      icon: <Repeat />,
-      link: '/changes',
+      condition: isInformationArchitectureEnabled,
+      icon: <IconViewQuilt />,
+      link: ROUTES.LAYOUT,
+      label: 'Layouts',
+      testId: 'side-nav-layouts-link',
+    },
+    {
       label: 'Changes',
+      icon: <Repeat />,
+      link: ROUTES.CHANGES,
       testId: 'side-nav-changes-link',
       rightSide: <ChangesCountBadge />,
       condition: !readonly,
     },
+    { label: 'Settings', icon: <Settings />, link: ROUTES.SETTINGS, testId: 'side-nav-settings-link' },
   ];
 
   async function handlePopoverForChanges(e) {
     e.preventDefault();
 
     await setEnvironment('Development');
-    navigate('/changes');
+    navigate(ROUTES.CHANGES);
   }
 
   return (
-    <Navbar p={30} sx={{ backgroundColor: 'transparent', borderRight: 'none', paddingRight: 0 }} width={{ base: 300 }}>
-      <Navbar.Section>
+    <Navbar
+      sx={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 'auto',
+        backgroundColor: 'transparent',
+        borderRight: 'none',
+        width: '300px',
+        minHeight: '100vh',
+        padding: '16px 0',
+        paddingBottom: '0px',
+        '@media (max-width: 768px)': {
+          width: '100%',
+        },
+      }}
+    >
+      <Navbar.Section sx={{ marginBottom: '24px', padding: '0 24px' }}>
+        <Link to="/">
+          <NovuLogo />
+        </Link>
+      </Navbar.Section>
+      <Navbar.Section sx={{ overflowY: 'auto', flex: 1, padding: '0 24px' }}>
         <Popover
-          styles={{
-            inner: {
-              padding: '12px 20px 14px 15px',
-            },
-            arrow: {
-              backgroundColor: dark ? colors.B20 : colors.white,
-              height: '7px',
-              border: 'none',
-              margin: '0px',
-            },
-            body: {
-              backgroundColor: dark ? colors.B20 : colors.white,
-              position: 'relative',
-              color: dark ? colors.white : colors.B40,
-              border: 'none',
-              marginTop: '1px',
-            },
-          }}
+          classNames={classes}
           withArrow
           opened={opened}
           onClose={() => setOpened(false)}
-          withCloseButton={true}
-          withinPortal={false}
+          withinPortal={true}
           transition="rotate-left"
           transitionDuration={250}
-          placement="center"
           position="right"
           radius="md"
           shadow={dark ? shadows.dark : shadows.medium}
-          target={
+        >
+          <Popover.Target>
             <SegmentedControl
               loading={isLoading}
               data={['Development', 'Production']}
@@ -103,30 +216,65 @@ export function SideNav({}: Props) {
               onChange={async (value) => {
                 await setEnvironment(value);
               }}
+              sx={{ marginBottom: '16px' }}
               data-test-id="environment-switch"
             />
-          }
-        >
-          {'To make changes you’ll need to visit '}
-          <StyledLink onClick={handlePopoverForChanges}>development changes</StyledLink>{' '}
-          {' and promote the changes from there'}
+          </Popover.Target>
+          <Popover.Dropdown>
+            <div style={{ maxWidth: '220px', paddingRight: '10px' }}>
+              <CloseButtonStyled onClick={() => setOpened(false)} aria-label="Close popover" />
+              {'To make changes you’ll need to visit '}
+              <StyledLink onClick={handlePopoverForChanges}>development changes</StyledLink>{' '}
+              {' and promote the changes from there'}
+            </div>
+          </Popover.Dropdown>
         </Popover>
         <NavMenu menuItems={menuItems} />
+        <FreeTrialSidebarWidget />
+        <OrganizationSelect />
+        <BottomNav dark={dark} data-test-id="side-nav-bottom-links">
+          <a
+            target="_blank"
+            rel="noopener noreferrer"
+            href="https://discord.novu.co"
+            data-test-id="side-nav-bottom-link-support"
+          >
+            Support
+          </a>
+          <p>
+            <b>&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</b>
+          </p>
+          <a
+            target="_blank"
+            rel="noopener noreferrer"
+            href={`https://docs.novu.co${UTM_CAMPAIGN_QUERY_PARAM}`}
+            data-test-id="side-nav-bottom-link-documentation"
+          >
+            Docs
+          </a>
+          <p>
+            <b>&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</b>
+          </p>
+          <a
+            target="_blank"
+            rel="noopener noreferrer"
+            href="https://github.com/novuhq/novu/issues/new/choose"
+            data-test-id="side-nav-bottom-link-share-feedback"
+          >
+            Share Feedback
+          </a>
+        </BottomNav>
       </Navbar.Section>
-      <BottomNav data-test-id="side-nav-bottom-links">
-        <a target="_blank" href="https://discord.gg/novu" data-test-id="side-nav-bottom-link-support">
-          Support
-        </a>
-        <p>
-          <b>&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</b>
-        </p>
-        <a target="_blank" href="https://docs.novu.co" data-test-id="side-nav-bottom-link-documentation">
-          Documentation
-        </a>
-      </BottomNav>
     </Navbar>
   );
 }
+
+const CloseButtonStyled = createPolymorphicComponent<'button', CloseButtonProps>(styled(CloseButton)`
+  position: absolute;
+  top: 7px;
+  z-index: 2;
+  right: 10px;
+`);
 
 const StyledLink = styled.a`
   font-weight: bold;
@@ -137,11 +285,9 @@ const StyledLink = styled.a`
   }
 `;
 
-const BottomNav = styled.div`
+const BottomNav = styled.div<{ dark: boolean }>`
+  color: ${colors.B60};
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: auto;
-  margin-bottom: 5px;
-  color: ${colors.B60};
 `;

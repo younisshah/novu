@@ -1,7 +1,4 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IApiKey, IWidgetSettings } from '@novu/dal';
-import { ApiKey } from '../../shared/dtos/api-key';
-import { WidgetSettings } from '../../shared/dtos/widget-settings';
 
 export class EnvironmentResponseDto {
   @ApiPropertyOptional()
@@ -16,16 +13,15 @@ export class EnvironmentResponseDto {
   @ApiProperty()
   identifier: string;
 
-  @ApiProperty({
-    type: [ApiKey],
-  })
-  apiKeys: IApiKey[];
-
-  @ApiProperty({
-    type: WidgetSettings,
-  })
-  widget: IWidgetSettings;
+  @ApiPropertyOptional()
+  apiKeys?: IApiKeyDto[];
 
   @ApiProperty()
   _parentId: string;
+}
+
+export interface IApiKeyDto {
+  key: string;
+  _userId: string;
+  hash?: string;
 }

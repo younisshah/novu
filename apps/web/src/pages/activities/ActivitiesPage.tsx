@@ -1,182 +1,103 @@
-import React, { useState, useEffect } from 'react';
-import { ChannelTypeEnum } from '@novu/shared';
-import { useQuery } from 'react-query';
-import { ColumnWithStrictAccessor } from 'react-table';
-import moment from 'moment';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
-import * as capitalize from 'lodash.capitalize';
+import { ChannelTypeEnum } from '@novu/shared';
 import styled from '@emotion/styled';
-import { useTemplates } from '../../api/hooks/use-templates';
+
+import { useTemplates, useDebounce } from '../../hooks';
 import { getActivityList } from '../../api/activity';
 import PageContainer from '../../components/layout/components/PageContainer';
-import PageMeta from '../../components/layout/components/PageMeta';
 import PageHeader from '../../components/layout/components/PageHeader';
-import { Data, Table } from '../../design-system/table/Table';
-import { Select, Tag, Text, Tooltip, Input, colors } from '../../design-system';
+import { Select, Input, Button } from '@novu/design-system';
 import { ActivityStatistics } from './components/ActivityStatistics';
 import { ActivityGraph } from './components/ActivityGraph';
+import { ActivityList } from './components/ActivityList';
+import { ExecutionDetailsModal } from '../../components/execution-detail/ExecutionDetailsModal';
+import { IActivityGraphStats } from './interfaces';
+import { Flex } from '@mantine/core';
+import { FIRST_100_WORKFLOWS } from '../../constants/workflowConstants';
+
+const FiltersContainer = styled.div`
+  gap: 15px;
+  padding: 30px;
+`;
 
 interface IFiltersForm {
-  channels?: ChannelTypeEnum[];
+  channels: ChannelTypeEnum[];
+  templates: string[];
+  transactionId: string;
+  email: string;
+  subscriberId: string;
 }
 
+const initialFormState: IFiltersForm = {
+  channels: [],
+  templates: [],
+  transactionId: '',
+  email: '',
+  subscriberId: '',
+};
+
 export function ActivitiesPage() {
-  const { templates, loading: loadingTemplates } = useTemplates();
+  const { templates, loading: loadingTemplates } = useTemplates(FIRST_100_WORKFLOWS);
   const [page, setPage] = useState<number>(0);
-  const [filters, setFilters] = useState<IFiltersForm>({ channels: [] });
-  const { data, isLoading, isFetching } = useQuery<{ data: any[]; totalCount: number; pageSize: number }>(
+  const [isModalOpen, setToggleModal] = useState<boolean>(false);
+  const [notificationId, setNotificationId] = useState<string>('');
+  const [filters, setFilters] = useState<IFiltersForm>(initialFormState);
+  const { data, isLoading, isFetching } = useQuery<{ data: any[]; hasMore: boolean; pageSize: number }>(
     ['activitiesList', page, filters],
     () => getActivityList(page, filters),
     { keepPreviousData: true }
   );
 
-  function onFiltersChange(formData: IFiltersForm) {
-    setFilters(formData);
+  function onFiltersChange(formData: Partial<IFiltersForm>) {
+    setFilters((old) => ({ ...old, ...formData }));
   }
 
   function handleTableChange(pageIndex) {
     setPage(pageIndex);
   }
 
-  const { handleSubmit, control, watch } = useForm({});
+  const {
+    control,
+    setValue,
+    reset,
+    formState: { isDirty },
+    getValues,
+  } = useForm<IFiltersForm>({
+    defaultValues: initialFormState,
+  });
 
-  useEffect(() => {
-    const subscription = watch((values) => handleSubmit(onFiltersChange)());
-
-    return () => subscription.unsubscribe();
-  }, [watch]);
-
-  function capitalizeSubscriberIfExist(subscriber) {
-    return subscriber
-      ? `${subscriber.firstName ? capitalize(subscriber.firstName) : ''} ${
-          subscriber.lastName ? capitalize(subscriber.lastName) : ''
-        }`
-      : 'Deleted Subscriber';
+  function onRowClick(event, selectedNotificationId) {
+    event.preventDefault();
+    setNotificationId(selectedNotificationId);
+    setToggleModal((state) => !state);
   }
 
-  const columns: ColumnWithStrictAccessor<Data>[] = [
-    {
-      accessor: 'status',
-      Header: '',
-      maxWidth: 10,
-      width: 10,
-      Cell: ({ status, errorText }: any) => (
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          {status === 'sent' ? <StatusBadge status="success" data-test-id={'status-badge'} /> : null}
-          {status === 'error' ? (
-            <Tooltip label={errorText}>
-              <StatusBadge status="error" data-test-id={'status-badge'} />
-            </Tooltip>
-          ) : null}
-          {status === 'warning' ? (
-            <Tooltip label={errorText}>
-              <StatusBadge status="error" data-test-id={'status-badge'} />
-            </Tooltip>
-          ) : null}
-        </div>
-      ),
-    },
-    {
-      accessor: 'template',
-      Header: 'Template Name',
-      Cell: ({ template }: any) => (
-        <>
-          {template ? (
-            <Tooltip label={template.name}>
-              <Text data-test-id="row-template-name" rows={1}>
-                {template.name}
-              </Text>
-            </Tooltip>
-          ) : (
-            'Deleted Template'
-          )}
-        </>
-      ),
-    },
-    {
-      accessor: 'subscriber',
-      Header: 'Subscriber',
-      Cell: ({ subscriber }: any) => (
-        <Text data-test-id="subscriber-name" rows={1}>
-          {capitalizeSubscriberIfExist(subscriber)}
-        </Text>
-      ),
-    },
-    {
-      accessor: 'recipient',
-      Header: 'Recipient',
-      Cell: ({ channel, email, phone, deviceTokens }: any) => (
-        <Text rows={1}>
-          {channel === ChannelTypeEnum.EMAIL ? email : ''} {channel === ChannelTypeEnum.SMS ? phone : ''}{' '}
-          {channel === ChannelTypeEnum.PUSH ? deviceTokens.join(',') : ''}
-        </Text>
-      ),
-    },
-    {
-      accessor: 'channel',
-      Header: 'Channel',
-      Cell: ({ channel }: any) => (
-        <>
-          {channel === ChannelTypeEnum.EMAIL ? (
-            <Tooltip label="Delivered on Email Channel">
-              <Tag data-test-id="row-email-channel">Email</Tag>
-            </Tooltip>
-          ) : null}
-          {channel === ChannelTypeEnum.IN_APP ? (
-            <Tooltip label="Delivered on Inbox Channel">
-              <Tag data-test-id="row-in-app-channel">In-App</Tag>
-            </Tooltip>
-          ) : null}
-          {channel === ChannelTypeEnum.SMS ? (
-            <Tooltip label="Delivered on SMS Channel">
-              <Tag data-test-id="row-sms-channel">SMS</Tag>
-            </Tooltip>
-          ) : null}
-          {channel === ChannelTypeEnum.PUSH ? (
-            <Tooltip label="Delivered on Push Channel">
-              <Tag data-test-id="row-sms-channel">Push</Tag>
-            </Tooltip>
-          ) : null}
-          {channel === ChannelTypeEnum.CHAT ? (
-            <Tooltip label="Delivered on Chat Channel">
-              <Tag data-test-id="row-chat-channel">Chat</Tag>
-            </Tooltip>
-          ) : null}
-        </>
-      ),
-    },
-    {
-      accessor: 'providerId',
-      Header: 'Provider',
-      Cell: ({ providerId }: any) => {
-        return (
-          <Text data-test-id="provider-id" rows={1}>
-            {providerId ? capitalize(providerId) : ''}
-          </Text>
-        );
-      },
-    },
+  function onModalClose() {
+    setNotificationId('');
+    setToggleModal(false);
+  }
 
-    {
-      accessor: 'createdAt',
-      Header: 'Sent On',
-      Cell: ({ createdAt }: any) => {
-        return moment(createdAt).isAfter(moment().subtract(1, 'day'))
-          ? moment(createdAt).fromNow()
-          : moment(createdAt).format('DD/MM/YYYY HH:mm');
-      },
-    },
-  ];
+  const onBarClick = (item: IActivityGraphStats) => {
+    setValue('channels', item.channels, { shouldDirty: true });
+    setValue('templates', item.templates, { shouldDirty: true });
+    onFiltersChange({ channels: item.channels, templates: item.templates });
+  };
+
+  const onClearClick = () => {
+    reset(initialFormState);
+    onFiltersChange(initialFormState);
+  };
 
   return (
-    <PageContainer>
-      <PageMeta title="Activity Feed" />
+    <PageContainer title="Activity Feed">
       <PageHeader title="Activity Feed" />
       <ActivityStatistics />
-      <ActivityGraph />
+      <ActivityGraph onBarClick={onBarClick} />
       <form>
-        <div style={{ width: '80%', display: 'flex', flexDirection: 'row', gap: '15px', padding: '30px' }}>
-          <div style={{ minWidth: '250px' }}>
+        <FiltersContainer>
+          <Flex mih={50} gap="md" justify="flex-start" align="flex-start" direction="row" wrap="wrap">
             <Controller
               render={({ field }) => (
                 <Select
@@ -190,76 +111,129 @@ export function ActivitiesPage() {
                     { value: ChannelTypeEnum.PUSH, label: 'Push' },
                   ]}
                   data-test-id="activities-filter"
-                  {...field}
+                  value={field.value}
+                  onChange={(value) => {
+                    field.onChange(value);
+                  }}
                 />
               )}
               control={control}
               name="channels"
             />
-          </div>
-          <div style={{ minWidth: '250px' }}>
             <Controller
               render={({ field }) => (
                 <Select
-                  label="Templates"
+                  label="Workflows"
                   type="multiselect"
                   data-test-id="templates-filter"
                   loading={loadingTemplates}
-                  placeholder="Select template"
-                  data={(templates || []).map((template) => ({ value: template._id as string, label: template.name }))}
-                  {...field}
+                  placeholder="Select workflow"
+                  data={(templates || []).map((template) => ({
+                    value: template._id as string,
+                    label: template.name,
+                  }))}
+                  value={field.value}
+                  onChange={(value) => {
+                    field.onChange(value);
+                  }}
                 />
               )}
               control={control}
               name="templates"
             />
-          </div>
-          <div style={{ minWidth: '250px' }}>
-            <Controller
-              render={({ field }) => (
-                <Input {...field} label="Search" placeholder="Select Email or ID" value={field.value || ''} />
-              )}
-              control={control}
-              name="search"
-            />
-          </div>
-        </div>
+            <div style={{ minWidth: '250px' }}>
+              <Controller
+                render={({ field, fieldState }) => (
+                  <Input
+                    {...field}
+                    error={fieldState.error?.message}
+                    label="Transaction ID"
+                    placeholder="Search by transaction id"
+                    value={field.value || ''}
+                    data-test-id="transactionId-filter"
+                  />
+                )}
+                control={control}
+                name="transactionId"
+              />
+            </div>
+
+            <div style={{ minWidth: '250px' }}>
+              <Controller
+                render={({ field, fieldState }) => (
+                  <Input
+                    {...field}
+                    error={fieldState.error?.message}
+                    label="E-mail"
+                    placeholder="Search by subscriber email"
+                    value={field.value || ''}
+                    data-test-id="email-filter"
+                  />
+                )}
+                control={control}
+                name="email"
+              />
+            </div>
+            <div style={{ minWidth: '250px' }}>
+              <Controller
+                render={({ field, fieldState }) => (
+                  <Input
+                    {...field}
+                    error={fieldState.error?.message}
+                    label="Subscriber ID"
+                    placeholder="Search by subscriberId"
+                    value={field.value || ''}
+                    data-test-id="subscriberId-filter"
+                  />
+                )}
+                control={control}
+                name="subscriberId"
+              />
+            </div>
+            <div style={{ paddingTop: 10, marginLeft: 'auto' }}>
+              <Button
+                variant="subtle"
+                size="md"
+                mt={30}
+                onClick={onClearClick}
+                data-test-id="clear-filters"
+                disabled={!isDirty}
+                style={{ marginRight: 15 }}
+              >
+                Clear
+              </Button>
+              <Button
+                variant="gradient"
+                loading={isLoading || isLoading}
+                size="md"
+                mt={30}
+                onClick={() => onFiltersChange(getValues())}
+                data-test-id="submit-filters"
+              >
+                Search
+              </Button>
+            </div>
+          </Flex>
+        </FiltersContainer>
       </form>
-      <Table
-        data-test-id="activities-table"
+      <ActivityList
         loading={isLoading || isFetching}
         data={data?.data || []}
-        columns={columns}
+        onRowClick={onRowClick}
         pagination={{
           pageSize: data?.pageSize,
           current: page,
-          total: data?.totalCount,
           onPageChange: handleTableChange,
+          minimalPagination: true,
+          hasMore: data?.hasMore,
         }}
-      >
-        {' '}
-      </Table>
+      />
+      <ExecutionDetailsModal
+        onViewDigestExecution={setNotificationId}
+        notificationId={notificationId}
+        modalVisibility={isModalOpen}
+        onClose={onModalClose}
+      />
     </PageContainer>
   );
 }
-
-const StatusBadge = styled.div<{ status: 'success' | 'error' | 'warning' }>`
-  display: inline-block;
-  width: 6px;
-  min-width: 6px;
-  height: 6px;
-  border-radius: 100%;
-
-  background-color: ${({ status }) => {
-    switch (status) {
-      case 'success':
-        return colors.success;
-      case 'warning':
-        return '#eca237';
-      case 'error':
-        return colors.error;
-      default:
-        return '#b2b2b2';
-    }
-  }};
-`;

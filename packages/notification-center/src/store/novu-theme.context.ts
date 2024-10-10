@@ -23,6 +23,7 @@ export interface INovuTheme {
   layout?: IThemeLayout;
   header?: IThemeHeader;
   popover?: IThemePopover;
+  actionsMenu?: IThemeActionsMenu;
   notificationItem?: IThemeNotificationListItem;
   userPreferences?: IThemeUserPreferences;
   footer?: IThemeFooter;
@@ -41,27 +42,37 @@ export interface IThemeLayout {
 export interface IThemeHeader {
   badgeColor?: string;
   badgeTextColor?: string;
+  tabBorderColor?: string;
   fontColor?: string;
+  markAllAsReadButtonColor?: string;
 }
 
 export interface IThemePopover {
   arrowColor?: string;
+  tabBorderColor?: string;
+}
+
+export interface IThemeActionsMenu {
+  dotsButtonColor?: string;
+  dropdownColor?: string;
+  hoverColor?: string;
+  fontColor?: string;
 }
 
 export interface IThemeNotificationListItem {
-  seen?: {
+  read?: {
     fontColor?: string;
     background?: string;
     timeMarkFontColor?: string;
   };
-  unseen?: {
+  unread?: {
     fontColor?: string;
     background?: string;
     boxShadow?: string;
     notificationItemBeforeBrandColor?: string;
     timeMarkFontColor?: string;
   };
-  buttons: IStyleButtons;
+  buttons?: IStyleButtons;
 }
 
 export interface IThemeUserPreferences {

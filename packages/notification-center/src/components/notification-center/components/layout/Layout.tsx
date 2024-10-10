@@ -1,37 +1,56 @@
-import styled from 'styled-components';
-import { Loader } from '../Loader';
-import { HeaderContainer as Header } from './header/HeaderContainer';
-import { FooterContainer as Footer } from './footer/FooterContainer';
-import React from 'react';
-import { useNovuContext, useNovuTheme, useScreens } from '../../../../hooks';
-import { INovuTheme, ScreensEnum } from '../../../../store';
-import { UserPreferenceHeader } from './header/UserPreferenceHeader';
-import { SubscriberPreference } from '../user-preference/SubscriberPreference';
+import React, { useState } from 'react';
+import styled from '@emotion/styled';
+import { css, cx } from '@emotion/css';
 
-export function Layout({ children }: { children: JSX.Element }) {
-  const { initialized } = useNovuContext();
+import { Header } from './header/Header';
+import { UserPreferenceHeader } from './header/UserPreferenceHeader';
+import { FooterContainer as Footer } from './footer/FooterContainer';
+
+import { Loader } from '../Loader';
+import { useNotificationCenter, useNovuContext, useNovuTheme } from '../../../../hooks';
+import { SubscriberPreference } from '../user-preference/SubscriberPreference';
+import { FeedsTabs } from '../FeedsTabs';
+import { INovuTheme } from '../../../../store/novu-theme.context';
+import { useStyles } from '../../../../store/styles';
+import { ScreensEnum } from '../../../../shared/interfaces';
+
+export function Layout() {
+  const { header } = useNotificationCenter();
+  const { isSessionInitialized } = useNovuContext();
   const { theme } = useNovuTheme();
-  const { screen } = useScreens();
+  const [layoutStyles] = useStyles(['layout.root']);
+  const [screen, setScreen] = useState<ScreensEnum>(ScreensEnum.NOTIFICATIONS);
 
   return (
-    <LayoutWrapper theme={theme} data-test-id="layout-wrapper">
-      {screen === ScreensEnum.SETTINGS && (
+    <div className={cx('nc-layout-wrapper', layoutWrapperCss(theme), css(layoutStyles))} data-test-id="layout-wrapper">
+      {screen === ScreensEnum.SETTINGS ? (
         <>
-          <UserPreferenceHeader />
+          {header ? (
+            header({ setScreen, screen })
+          ) : (
+            <UserPreferenceHeader onBackClick={() => setScreen(ScreensEnum.NOTIFICATIONS)} />
+          )}
           <ContentWrapper>
             <SubscriberPreference />
           </ContentWrapper>
         </>
-      )}
-      {screen === ScreensEnum.NOTIFICATIONS && (
+      ) : (
         <>
-          <Header />
-          <ContentWrapper>{initialized ? children : <Loader />}</ContentWrapper>
+          {header ? header({ setScreen, screen }) : <Header onCogClick={() => setScreen(ScreensEnum.SETTINGS)} />}
+          <ContentWrapper>
+            {isSessionInitialized ? (
+              <MainWrapper data-test-id="main-wrapper">
+                <FeedsTabs />
+              </MainWrapper>
+            ) : (
+              <Loader />
+            )}
+          </ContentWrapper>
         </>
       )}
 
       <Footer />
-    </LayoutWrapper>
+    </div>
   );
 }
 
@@ -40,10 +59,12 @@ const ContentWrapper = styled.div`
   min-height: 400px;
 `;
 
-const LayoutWrapper = styled.div<{ theme: INovuTheme }>`
+const layoutWrapperCss = (novuTheme: INovuTheme) => css`
   padding: 15px 0;
   height: auto;
   border-radius: 7px;
-  box-shadow: ${({ theme }) => theme.layout.boxShadow};
-  background: ${({ theme }) => theme.layout.background};
+  box-shadow: ${novuTheme.layout.boxShadow};
+  background: ${novuTheme.layout.background};
 `;
+
+const MainWrapper = styled.div``;

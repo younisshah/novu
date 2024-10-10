@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { I18NLanguage, ITranslationEntry, TRANSLATIONS } from '../i18n/lang';
 
 export const I18NContext = React.createContext<ITranslationEntry>({
@@ -7,6 +8,9 @@ export const I18NContext = React.createContext<ITranslationEntry>({
     notifications: '',
     poweredBy: '',
     settings: '',
+    removeMessage: '',
+    markAsRead: '',
+    markAsUnRead: '',
   },
   lang: '',
 });

@@ -8,13 +8,15 @@
     "allowSyntheticDefaultImports": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
+    "strictNullChecks": true,
     "target": "es6",
     "esModuleInterop": false,
     "sourceMap": true,
+    "skipLibCheck": true,
     "outDir": "./dist",
     "baseUrl": "./src",
     "types": ["node", "mocha"]
   },
   "include": [".eslintrc.js", "src/**/*", "src/**/*.d.ts"],
-  "exclude": ["node_modules", "**/*.spec.ts"]
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.e2e.ts", "**/*.e2e-ee.ts"]
 }

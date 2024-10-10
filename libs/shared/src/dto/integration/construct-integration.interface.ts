@@ -1,22 +1,20 @@
-export interface ICredentialsDto {
-  apiKey?: string;
-  user?: string;
-  secretKey?: string;
-  domain?: string;
-  password?: string;
-  host?: string;
-  port?: string;
-  secure?: boolean;
-  region?: string;
-  accountSid?: string;
-  messageProfileId?: string;
-  token?: string;
-  from?: string;
-  senderName?: string;
-  projectName?: string;
-}
-export interface IConstructIntegrationDto {
-  credentials: ICredentialsDto;
+import { ICredentials } from '../../entities/integration';
+import type { EnvironmentId } from '../../types';
+import { BuilderFieldType, BuilderGroupValues, FilterParts } from '../../types';
 
-  active: boolean;
+export type ICredentialsDto = ICredentials;
+
+export interface IConstructIntegrationDto {
+  name?: string;
+  identifier?: string;
+  _environmentId?: EnvironmentId;
+  credentials?: ICredentialsDto;
+  active?: boolean;
+  check?: boolean;
+  conditions?: {
+    isNegated?: boolean;
+    type?: BuilderFieldType;
+    value?: BuilderGroupValues;
+    children?: FilterParts[];
+  }[];
 }

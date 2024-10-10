@@ -1,25 +1,29 @@
-import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, Provider, RequestMethod } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import * as passport from 'passport';
+
+import { AuthProviderEnum, PassportStrategyEnum } from '@novu/shared';
+import { AuthService } from '@novu/application-generic';
+
 import { RolesGuard } from './framework/roles.guard';
 import { JwtStrategy } from './services/passport/jwt.strategy';
 import { AuthController } from './auth.controller';
 import { UserModule } from '../user/user.module';
-import { AuthService } from './services/auth.service';
 import { USE_CASES } from './usecases';
 import { SharedModule } from '../shared/shared.module';
-import { GithubStrategy } from './services/passport/github.strategy';
+import { GitHubStrategy } from './services/passport/github.strategy';
 import { OrganizationModule } from '../organization/organization.module';
 import { EnvironmentsModule } from '../environments/environments.module';
 import { JwtSubscriberStrategy } from './services/passport/subscriber-jwt.strategy';
-import { JwtAuthGuard } from './framework/auth.guard';
+import { UserAuthGuard } from './framework/user.auth.guard';
 import { RootEnvironmentGuard } from './framework/root-environment-guard.service';
+import { ApiKeyStrategy } from './services/passport/apikey.strategy';
 
-const AUTH_STRATEGIES = [];
+const AUTH_STRATEGIES: Provider[] = [JwtStrategy, ApiKeyStrategy, JwtSubscriberStrategy];
 
 if (process.env.GITHUB_OAUTH_CLIENT_ID) {
-  AUTH_STRATEGIES.push(GithubStrategy);
+  AUTH_STRATEGIES.push(GitHubStrategy);
 }
 
 @Module({
@@ -28,7 +32,7 @@ if (process.env.GITHUB_OAUTH_CLIENT_ID) {
     SharedModule,
     UserModule,
     PassportModule.register({
-      defaultStrategy: 'jwt',
+      defaultStrategy: PassportStrategyEnum.JWT,
     }),
     JwtModule.register({
       secretOrKeyProvider: () => process.env.JWT_SECRET as string,
@@ -39,24 +43,15 @@ if (process.env.GITHUB_OAUTH_CLIENT_ID) {
     EnvironmentsModule,
   ],
   controllers: [AuthController],
-  providers: [
-    JwtAuthGuard,
-    ...USE_CASES,
-    ...AUTH_STRATEGIES,
-    JwtStrategy,
-    AuthService,
-    RolesGuard,
-    JwtSubscriberStrategy,
-    RootEnvironmentGuard,
-  ],
-  exports: [RolesGuard, RootEnvironmentGuard, AuthService, ...USE_CASES, JwtAuthGuard],
+  providers: [UserAuthGuard, ...USE_CASES, ...AUTH_STRATEGIES, AuthService, RolesGuard, RootEnvironmentGuard],
+  exports: [RolesGuard, RootEnvironmentGuard, AuthService, ...USE_CASES, UserAuthGuard],
 })
 export class AuthModule implements NestModule {
   public configure(consumer: MiddlewareConsumer) {
     if (process.env.GITHUB_OAUTH_CLIENT_ID) {
       consumer
         .apply(
-          passport.authenticate('github', {
+          passport.authenticate(AuthProviderEnum.GITHUB, {
             session: false,
             scope: ['user:email'],
           })

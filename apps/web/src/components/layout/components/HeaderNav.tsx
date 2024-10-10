@@ -1,82 +1,114 @@
-import {
-  Avatar,
-  useMantineColorScheme,
-  ActionIcon,
-  Header,
-  Group,
-  Menu as MantineMenu,
-  Container,
-} from '@mantine/core';
-import { useContext, useEffect } from 'react';
+import { ActionIcon, Avatar, Badge, ColorScheme, Container, Group, Header, useMantineColorScheme } from '@mantine/core';
 import * as capitalize from 'lodash.capitalize';
-import { useIntercom } from 'react-use-intercom';
+import { useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { AuthContext } from '../../../store/authContext';
-import { shadows, colors, Text, Dropdown } from '../../../design-system';
-import { Sun, Moon, Ellipse, Bell, Trash, Mail } from '../../../design-system/icons';
-import { useLocalThemePreference } from '../../../hooks/use-localThemePreference';
-import { NotificationCenterWidget } from '../../widget/NotificationCenterWidget';
-import { Tooltip } from '../../../design-system';
-import { INTERCOM_APP_ID } from '../../../config';
 
-type Props = {};
+import { CONTEXT_PATH, IS_DOCKER_HOSTED, REACT_APP_VERSION } from '../../../config';
+import { ROUTES } from '../../../constants/routes.enum';
+import {
+  colors,
+  Dropdown,
+  shadows,
+  Text,
+  Tooltip,
+  Ellipse,
+  Moon,
+  Question,
+  Sun,
+  Logout,
+  InviteMembers,
+} from '@novu/design-system';
+import { useLocalThemePreference, useDebounce, useBootIntercom } from '../../../hooks';
+import { discordInviteUrl } from '../../../pages/quick-start/consts';
+import { useAuthContext } from '../../providers/AuthProvider';
+import { useSpotlightContext } from '../../providers/SpotlightProvider';
+import { HEADER_NAV_HEIGHT } from '../constants';
+import { NotificationCenterWidget } from './NotificationCenterWidget';
+import { useSegment } from '../../providers/SegmentProvider';
+import { EchoStatus } from './EchoStatus';
+
+type Props = { isIntercomOpened: boolean };
 const menuItem = [
   {
     title: 'Invite Members',
-    icon: <Mail />,
-    path: '/team',
+    icon: <InviteMembers />,
+    path: ROUTES.TEAM,
   },
 ];
-const headerIconsSettings = { color: colors.B60, width: 30, height: 30 };
+const headerIconsSettings = { color: colors.B60, width: 24, height: 24 };
 
-export function HeaderNav({}: Props) {
-  const { currentOrganization, currentUser, logout } = useContext(AuthContext);
-  const { colorScheme, toggleColorScheme } = useMantineColorScheme();
-  const { themeStatus, setThemeStatus } = useLocalThemePreference();
-  const dark = colorScheme === 'dark';
+const Icon = () => {
+  const { themeStatus } = useLocalThemePreference();
 
-  if (INTERCOM_APP_ID) {
-    const { boot } = useIntercom();
-
-    useEffect(() => {
-      if (currentUser && currentOrganization) {
-        boot({
-          email: currentUser?.email,
-          name: currentUser?.firstName + ' ' + currentUser?.lastName,
-          createdAt: currentUser?.createdAt,
-          company: {
-            name: currentOrganization?.name,
-            companyId: currentOrganization?._id as string,
-          },
-        });
-      }
-    }, [currentUser, currentOrganization]);
+  if (themeStatus === 'dark') {
+    return <Moon {...headerIconsSettings} />;
+  }
+  if (themeStatus === 'light') {
+    return <Sun {...headerIconsSettings} />;
   }
 
-  const themeTitle = () => {
-    let title = 'Match System Appearance';
-    if (themeStatus === 'dark') {
-      title = `Dark Theme`;
-    } else if (themeStatus === 'light') {
-      title = `Light Theme`;
-    }
+  return <Ellipse {...headerIconsSettings} />;
+};
 
-    return title;
-  };
+/**
+ * @deprecated This file will be removed in future.
+ * Use HeaderNav from V2 folder instead.
+ */
+export function HeaderNav({ isIntercomOpened }: Props) {
+  const { currentOrganization, currentUser, logout } = useAuthContext();
+  const { colorScheme, toggleColorScheme } = useMantineColorScheme();
+  const { themeStatus } = useLocalThemePreference();
+  const { addItem, removeItems } = useSpotlightContext();
 
-  const Icon = () => {
-    if (themeStatus === 'dark') {
-      return <Moon {...headerIconsSettings} />;
-    }
-    if (themeStatus === 'light') {
-      return <Sun {...headerIconsSettings} />;
-    }
+  const segment = useSegment();
+  const isSelfHosted = IS_DOCKER_HOSTED;
 
-    return <Ellipse {...headerIconsSettings} height={24} width={24} />;
-  };
+  const debounceThemeChange = useDebounce((args: { colorScheme: ColorScheme; themeStatus: string }) => {
+    segment.track('Theme is set - [Theme]', args);
+  }, 500);
+
+  useEffect(() => {
+    debounceThemeChange({ colorScheme, themeStatus });
+  }, [colorScheme, themeStatus, debounceThemeChange]);
+
+  useBootIntercom();
+
+  let themeTitle = 'Match System Appearance';
+  if (themeStatus === 'dark') {
+    themeTitle = 'Dark Theme';
+  } else if (themeStatus === 'light') {
+    themeTitle = 'Light Theme';
+  }
+
+  const additionalMenuItems = useMemo(() => {
+    return [
+      {
+        id: 'toggle-theme',
+        title: themeTitle,
+        icon: <Icon />,
+        onTrigger: () => {
+          toggleColorScheme();
+        },
+      },
+      {
+        id: 'sign-out',
+        title: 'Sign out',
+        icon: <Logout />,
+        onTrigger: () => {
+          logout();
+        },
+      },
+    ];
+  }, [toggleColorScheme, logout, themeTitle]);
+
+  useEffect(() => {
+    removeItems(additionalMenuItems.map((item) => item.id));
+
+    addItem(additionalMenuItems);
+  }, [addItem, removeItems, additionalMenuItems]);
 
   const profileMenuMantine = [
-    <MantineMenu.Item disabled key="user">
+    <Dropdown.Item disabled key="user">
       <Group spacing={15}>
         <Avatar
           sx={(theme) => ({
@@ -84,7 +116,7 @@ export function HeaderNav({}: Props) {
           })}
           radius="xl"
           size={45}
-          src={currentUser?.profilePicture || '/static/images/avatar.png'}
+          src={currentUser?.profilePicture || CONTEXT_PATH + '/static/images/avatar.png'}
         />
         <div style={{ flex: 1 }}>
           <Text data-test-id="header-dropdown-username" rows={1}>
@@ -95,50 +127,78 @@ export function HeaderNav({}: Props) {
           </Text>
         </div>
       </Group>
-    </MantineMenu.Item>,
+    </Dropdown.Item>,
     ...menuItem.map(({ title, icon, path }) => (
-      <Link to={path}>
-        <MantineMenu.Item key={title} icon={icon} component="div">
+      <Link to={path} key={title}>
+        <Dropdown.Item key={title} icon={icon} component="div">
           {title}
-        </MantineMenu.Item>
+        </Dropdown.Item>
       </Link>
     )),
-    <MantineMenu.Item key="logout" icon={<Trash />} onClick={logout} data-test-id="logout-button">
-      Sign Out
-    </MantineMenu.Item>,
+    <Dropdown.Item key="logout" icon={<Logout />} onClick={logout} data-test-id="logout-button">
+      Log Out
+    </Dropdown.Item>,
   ];
+
+  isSelfHosted &&
+    profileMenuMantine.push(
+      <Dropdown.Item
+        style={{
+          padding: '10px 20px',
+        }}
+        disabled
+        key="version"
+      >
+        <Text color={colors.B40}>Version: {REACT_APP_VERSION}</Text>
+      </Dropdown.Item>
+    );
 
   return (
     <Header
-      height="65px"
-      sx={(theme) => ({
-        boxShadow: theme.colorScheme === 'dark' ? shadows.dark : shadows.light,
+      height={`${HEADER_NAV_HEIGHT}px`}
+      sx={{
+        position: 'sticky',
+        top: 0,
         borderBottom: 'none',
-      })}
+        zIndex: 199,
+      }}
     >
       <Container
         fluid
-        p={30}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%' }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', height: `${HEADER_NAV_HEIGHT}px` }}
       >
-        <img
-          src={dark ? '/static/images/logo-formerly-dark-bg.png' : '/static/images/logo-formerly-light-bg.png'}
-          alt="logo"
-          style={{ maxWidth: 150, maxHeight: 25 }}
-        />
         <Group>
+          <EchoStatus />
+
           <ActionIcon variant="transparent" onClick={() => toggleColorScheme()}>
-            <Tooltip label={themeTitle()}>{Icon()}</Tooltip>
+            <Tooltip label={themeTitle}>
+              <div>
+                <Icon />
+              </div>
+            </Tooltip>
           </ActionIcon>
+          {isSelfHosted ? (
+            <a href={discordInviteUrl} target="_blank" rel="noreferrer">
+              <ActionIcon variant="transparent">
+                <Question width={24} height={24} color={colors.B60} isGradient={isIntercomOpened} />
+              </ActionIcon>
+            </a>
+          ) : (
+            <ActionIcon variant="transparent" id="intercom-launcher">
+              <Question width={24} height={24} color={colors.B60} isGradient={isIntercomOpened} />
+            </ActionIcon>
+          )}
           <NotificationCenterWidget user={currentUser} />
           <Dropdown
+            position="bottom-end"
+            styles={{ dropdown: { minWidth: 220 } }}
             control={
               <ActionIcon variant="transparent">
                 <Avatar
-                  size={35}
+                  size={24}
                   radius="xl"
                   data-test-id="header-profile-avatar"
-                  src={currentUser?.profilePicture || '/static/images/avatar.png'}
+                  src={currentUser?.profilePicture || CONTEXT_PATH + '/static/images/avatar.png'}
                 />
               </ActionIcon>
             }

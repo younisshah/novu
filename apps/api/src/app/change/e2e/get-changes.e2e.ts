@@ -1,11 +1,15 @@
-import { ChangeRepository } from '@novu/dal';
-import { StepTypeEnum } from '@novu/shared';
-import { UserSession } from '@novu/testing';
 import { expect } from 'chai';
+import { ChangeRepository } from '@novu/dal';
 import {
-  CreateNotificationTemplateRequestDto,
-  UpdateNotificationTemplateRequestDto,
-} from '../../notification-template/dto';
+  EmailBlockTypeEnum,
+  StepTypeEnum,
+  FilterPartTypeEnum,
+  FieldLogicalOperatorEnum,
+  FieldOperatorEnum,
+} from '@novu/shared';
+import { UserSession } from '@novu/testing';
+
+import { CreateWorkflowRequestDto, UpdateWorkflowRequestDto } from '../../workflows/dto';
 
 describe('Get changes', () => {
   let session: UserSession;
@@ -17,7 +21,7 @@ describe('Get changes', () => {
   });
 
   it('get list of changes', async () => {
-    const testTemplate: Partial<CreateNotificationTemplateRequestDto> = {
+    const testTemplate: Partial<CreateWorkflowRequestDto> = {
       name: 'test email template',
       description: 'This is a test description',
       tags: ['test-tag'],
@@ -27,19 +31,20 @@ describe('Get changes', () => {
           template: {
             name: 'Message Name',
             subject: 'Test email subject',
-            content: [{ type: 'text', content: 'This is a sample text block' }],
+            content: [{ type: EmailBlockTypeEnum.TEXT, content: 'This is a sample text block' }],
             type: StepTypeEnum.EMAIL,
           },
           filters: [
             {
               isNegated: false,
               type: 'GROUP',
-              value: 'AND',
+              value: FieldLogicalOperatorEnum.AND,
               children: [
                 {
+                  on: FilterPartTypeEnum.SUBSCRIBER,
                   field: 'firstName',
                   value: 'test value',
-                  operator: 'EQUAL',
+                  operator: FieldOperatorEnum.EQUAL,
                 },
               ],
             },
@@ -48,11 +53,11 @@ describe('Get changes', () => {
       ],
     };
 
-    const { body } = await session.testAgent.post(`/v1/notification-templates`).send(testTemplate);
+    const { body } = await session.testAgent.post(`/v1/workflows`).send(testTemplate);
 
     await session.applyChanges();
 
-    const updateData: UpdateNotificationTemplateRequestDto = {
+    const updateData: UpdateWorkflowRequestDto = {
       name: testTemplate.name,
       tags: testTemplate.tags,
       description: testTemplate.description,
@@ -62,13 +67,14 @@ describe('Get changes', () => {
 
     const notificationTemplateId = body.data._id;
 
-    await session.testAgent.put(`/v1/notification-templates/${notificationTemplateId}`).send(updateData);
+    await session.testAgent.put(`/v1/workflows/${notificationTemplateId}`).send(updateData);
 
     const {
       body: { data },
     } = await session.testAgent.get(`/v1/changes?promoted=true`);
 
     const changes = await changeRepository.find({
+      _environmentId: session.environment._id,
       enabled: true,
       _parentId: { $exists: false, $eq: null },
     });

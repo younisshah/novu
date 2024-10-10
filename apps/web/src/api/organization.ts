@@ -1,12 +1,32 @@
 import { MemberRoleEnum } from '@novu/shared';
 import { api } from './api.client';
 
-export function getOrganizationMembers() {
-  return api.get(`/v1/organizations/members`);
+export type OrgColorType = string;
+
+export type UpdateOrgBrandingPayloadType = {
+  logo?: string;
+  color?: OrgColorType;
+  fontColor?: OrgColorType;
+  fontFamily?: string;
+  contentBackgroundValue?: string;
+};
+
+export function getOrganizations() {
+  return api.get(`/v1/organizations`);
 }
 
-export function getCurrentOrganization() {
-  return api.get(`/v1/organizations/me`);
+export function addOrganization(name: string) {
+  return api.post(`/v1/organizations`, {
+    name,
+  });
+}
+
+export function switchOrganization(organizationId: string) {
+  return api.post(`/v1/auth/organizations/${organizationId}/switch`, {});
+}
+
+export function getOrganizationMembers() {
+  return api.get(`/v1/organizations/members`);
 }
 
 export function inviteMember(email: string) {
@@ -32,6 +52,10 @@ export function removeMember(memberId: string) {
   return api.delete(`/v1/organizations/members/${memberId}`);
 }
 
-export function updateBrandingSettings(payload: { color: string | undefined; logo: string | undefined }) {
+export function updateBrandingSettings(payload: UpdateOrgBrandingPayloadType) {
   return api.put(`/v1/organizations/branding`, payload);
+}
+
+export function renameOrganization(organizationName: string) {
+  return api.patch(`/v1/organizations`, { name: organizationName });
 }

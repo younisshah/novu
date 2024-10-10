@@ -4,10 +4,33 @@ name: Test WEB
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 on:
-  workflow_call:
-    secrets:
-      cypress_key:
+  workflow_dispatch:
+    inputs:
+      ee:
+        description: 'use the ee version of worker'
         required: false
+        default: true
+        type: boolean
+      environment:
+        required: false
+        default: 'Development'
+        type: string
+  workflow_call:
+    inputs:
+      ee:
+        description: 'use the ee version of worker'
+        required: false
+        default: false
+        type: boolean
+      slack_notification:
+        description: 'notify if e2e fail via slack'
+        required: false
+        default: false
+        type: boolean
+      environment:
+        required: false
+        default: 'Development'
+        type: string
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -22,126 +45,172 @@ jobs:
       # https://github.com/cypress-io/github-action/issues/48
       fail-fast: false
       matrix:
-        # run 3 copies of the current job in parallel
-        containers: [1, 2, 3]
+        # run 5 copies of the current job in parallel
+        containers: [1, 2, 3, 4, 5]
+        total: [5]
 
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     timeout-minutes: 80
+    environment: ${{ inputs.environment }}
+
+    permissions:
+      contents: read
+      packages: write
+      deployments: write
+      id-token: write
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
-      - name: Setup kernel for react native, increase watchers
-        run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
-      - uses: actions/setup-node@v2
-        with:
-          node-version: '16.15.1'
-
-      - name: Start Redis
-        uses: supercharge/redis-github-action@1.2.0
-
-      - name: Start MongoDB
-        uses: supercharge/mongodb-github-action@1.3.0
-        with:
-          mongodb-version: 4.2.8
-
-      - name: Cache pnpm modules
-        uses: actions/cache@v2
-        with:
-          path: ~/.pnpm-store
-          key: ${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-
-
-      - uses: pnpm/action-setup@v2.0.1
-        with:
-          version: 7.5.0
-          run_install: true
-
-      - uses: mansagroup/nrwl-nx-action@v2
-        with:
-          targets: lint
-          projects: "@novu/web"
-
-      - name: Start Local Stack
-        env:
-          DEFAULT_REGION: us-east-1
-          AWS_DEFAULT_REGION: us-east-1
-          AWS_ACCOUNT_ID: "000000000000"
-          AWS_ACCESS_KEY_ID: test
-          AWS_SECRET_ACCESS_KEY: test
-          AWS_EC2_METADATA_DISABLED: true
-        working-directory: environment/test
+      - id: setup
         run: |
-          docker-compose up -d
-          sleep 5
-          max_retry=30
-          counter=0
-          until $command
-          do
-             sleep 1
-             [[ counter -eq $max_retry ]] && echo "Failed!" && exit 1
-             aws --endpoint-url=http://localhost:4566 s3 ls
-             echo "Trying again. Try #$counter"
-             ((counter++))
-          done
-          sleep 1
-          aws --endpoint-url=http://localhost:4566 --cli-connect-timeout 600 s3 mb s3://novu-test
+          if ! [[ -z "${{ secrets.SUBMODULES_TOKEN }}" ]]; then
+            echo "has_token=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_token=false" >> $GITHUB_OUTPUT
+          fi
 
-      # Runs a single command using the runners shell
-      - name: Build
-        run: CI='' pnpm build:web
-        
-      - name: Build API
-        run: CI='' pnpm build:api
+      # checkout with submodules if token is provided
+      - uses: actions/checkout@v3
+        if: steps.setup.outputs.has_token == 'true'
+        with:
+          submodules: ${{ inputs.ee }}
+          token: ${{ secrets.SUBMODULES_TOKEN }}
+      # else checkout without submodules if the token is not provided
+      - uses: actions/checkout@v3
+        if: steps.setup.outputs.has_token != 'true'
+      - uses: ./.github/actions/setup-project
+        id: setup-project
+        with:
+          cypress: true
+          submodules: true
+
+      - uses: mansagroup/nrwl-nx-action@v3
+        with:
+          targets: build
+          projects: '@novu/web,@novu/api,@novu/worker'
+          args: --skip-nx-cache
+
+      - uses: ./.github/actions/start-localstack
+      - uses: ./.github/actions/setup-redis-cluster
+
+      - uses: ./.github/actions/run-backend
+        with:
+          cypress_github_oauth_client_id: ${{ secrets.CYPRESS_GITHUB_OAUTH_CLIENT_ID }}
+          cypress_github_oauth_client_secret: ${{ secrets.CYPRESS_GITHUB_OAUTH_CLIENT_SECRET }}
+          launch_darkly_sdk_key: ${{ secrets.LAUNCH_DARKLY_SDK_KEY }}
+          ci_ee_test: ${{ steps.setup.outputs.has_token }}
 
       - name: Start Client
-        run: pnpm start:web &
+        working-directory: apps/web
+        env:
+          REACT_APP_API_URL: http://127.0.0.1:1336
+          REACT_APP_WS_URL: http://127.0.0.1:1340
+          REACT_APP_WEBHOOK_URL: http://127.0.0.1:1341
+          REACT_APP_LAUNCH_DARKLY_CLIENT_SIDE_ID: ${{ secrets.TEST_LAUNCH_DARKLY_CLIENT_SIDE_ID }}
+        run: pnpm start:static:build &
 
-      - name: Start API in TEST
-        run: cd apps/api && pnpm start:test &
+      - name: Start WS
+        run: |
+          cd apps/ws && pnpm start:test &
 
-      - name: Install wait-on plugin
-        run: npm i -g wait-on
+      - name: Wait on Services
+        run: wait-on --timeout=180000 http://127.0.0.1:1340/v1/health-check http://127.0.0.1:4200/
 
-      - name: Wait on API
-        run: wait-on --timeout=120000 http://localhost:1336/v1/health-check
+      # run cypress install only when cache was not hit
+      - name: Cypress install
+        if: steps.setup-project.outputs.cypress_cache_hit != 'true'
+        working-directory: apps/web
+        run: pnpm cypress install
+
+      - uses: browser-actions/setup-chrome@latest
+        with:
+          chrome-version: "stable"
+      - run: |
+          echo "BROWSER_PATH=$(which chrome)" >> $GITHUB_ENV
 
       - name: Cypress run e2e
-        uses: cypress-io/github-action@v4
+        uses: cypress-io/github-action@v6
         env:
           NODE_ENV: test
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CYPRESS_RECORD_KEY: ${{ secrets.cypress_key }}
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_WEB_KEY }}
+          CYPRESS_GITHUB_USER_EMAIL: ${{ secrets.CYPRESS_GITHUB_USER_EMAIL }}
+          CYPRESS_GITHUB_USER_PASSWORD: ${{ secrets.CYPRESS_GITHUB_USER_PASSWORD }}
+          CYPRESS_IS_CI: true
         with:
           working-directory: apps/web
-          browser: chrome
+          browser: "${{ env.BROWSER_PATH }}"
           record: true
           parallel: true
           install: false
           config-file: cypress.config.ts
+          spec: |
+            cypress/tests/**/*.spec.ts
+            ${{ steps.setup.outputs.has_token == 'true' && inputs.ee && 'cypress/tests/**/*.spec-ee.ts' }}
 
-      - name: Cypress run component tests
-        uses: cypress-io/github-action@v4
-        env:
-          NODE_ENV: test
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CYPRESS_RECORD_KEY: ${{ secrets.cypress_key }}
-        with:
-          working-directory: apps/web
-          browser: chrome
-          component: true
-          record: true
-          install: false
-          config-file: cypress.config.ts
+      - name: Playwright Install
+        working-directory: apps/web
+        run: pnpm playwright:install
 
-      - uses: actions/upload-artifact@v1
-        if: failure()
+      - name: Run Playwright tests
+        working-directory: apps/web
+        run: pnpm playwright:test --shard=${{ matrix.containers }}/${{ matrix.total }}
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
         with:
-          name: cypress-screenshots
+          name: blob-report-${{ matrix.containers }}
+          path: apps/web/blob-report
+          retention-days: 1
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: cypress-screenshots-${{ matrix.containers }}
           path: apps/web/cypress/screenshots
+          retention-days: 30
+
+  merge-reports:
+    # Merge reports after playwright-tests, even if some shards have failed
+    if: ${{ !cancelled() }}
+    needs: [e2e_web]
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20.8.1
+
+    - name: Download blob reports from GitHub Actions Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: all-blob-reports
+        pattern: blob-report-*
+        merge-multiple: true
+
+    - name: Merge into HTML Report
+      run: npx playwright merge-reports --reporter html ./all-blob-reports
+
+    - name: Upload HTML report
+      uses: actions/upload-artifact@v4
+      with:
+        name: html-report--attempt-${{ github.run_attempt }}
+        path: playwright-report
+        retention-days: 14
+
+    - name: Notify Slack Action
+      uses: ravsamhq/notify-slack-action@v2
+      if: ${{ inputs.slack_notification && needs.e2e_web.result == 'failure' }}
+      with:
+        status: "failure"
+        notification_title: "{workflow} for WEB has failed"
+        message_format: "{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}>"
+        footer: "Linked Run URL {run_url}\nCommit URL{commit_url}"
+        notify_when: "failure"
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   component_web:
     if: "!contains(github.event.head_commit.message, 'ci skip')"
@@ -149,58 +218,53 @@ jobs:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     timeout-minutes: 80
+    environment: ${{ inputs.environment }}
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
-      - name: Setup kernel for react native, increase watchers
-        run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
-      - uses: actions/setup-node@v2
-        with:
-          node-version: '16.15.1'
+      - uses: actions/checkout@v3
 
-      - name: Start Redis
-        uses: supercharge/redis-github-action@1.2.0
-
-      - name: Start MongoDB
-        uses: supercharge/mongodb-github-action@1.3.0
-        with:
-          mongodb-version: 4.2.8
-
-      - name: Cache pnpm modules
-        uses: actions/cache@v2
-        with:
-          path: ~/.pnpm-store
-          key: ${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-
-
-      - uses: pnpm/action-setup@v2.0.1
-        with:
-          version: 7.5.0
-          run_install: true
+      - uses: ./.github/actions/setup-project
+        id: setup-project
 
       # Runs a single command using the runners shell
       - name: Build
-        run: CI='' pnpm build:web
+        run: CI='' pnpm build:web --skip-nx-cache
 
-      - name: Cypress run component tests
-        uses: cypress-io/github-action@v4
+      # run cypress install only when cache was not hit
+      - name: Cypress install
+        if: steps.setup-project.outputs.cypress_cache_hit != 'true'
+        working-directory: apps/web
+        run: pnpm cypress install
+
+      - name: Run Component tests 🧪
+        uses: cypress-io/github-action@v6
         env:
           NODE_ENV: test
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CYPRESS_RECORD_KEY: ${{ secrets.cypress_key }}
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_WEB_KEY }}
+          NODE_OPTIONS: --max_old_space_size=4096
         with:
-          working-directory: apps/web
           browser: chrome
-          component: true
-          record: true
+          working-directory: apps/web
           install: false
-          config-file: cypress.config.ts
+          component: true
 
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: cypress-screenshots
           path: apps/web/cypress/screenshots
+
+      - name: Notify Slack Action
+        uses: ravsamhq/notify-slack-action@v2
+        if: ${{ always() && inputs.slack_notification }}
+        with:
+          status: ${{ job.status }}
+          notification_title: "{workflow} for Component WEB has {status_message}"
+          message_format: "{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}>"
+          footer: "Linked Run URL {run_url}\nCommit URL{commit_url}"
+          notify_when: "failure"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

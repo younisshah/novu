@@ -1,11 +1,22 @@
-import { NotificationCenter, NovuProvider } from '@novu/notification-center';
-import { INovuThemeProvider } from '@novu/notification-center';
-import { IMessage, IOrganizationEntity, ButtonTypeEnum } from '@novu/shared';
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import * as WebFont from 'webfontloader';
-import { API_URL, WS_URL } from '../../config';
-import { createGlobalStyle } from 'styled-components';
+import { css, Global } from '@emotion/react';
+import {
+  NotificationCenter,
+  NovuProvider,
+  ITranslationEntry,
+  ITab,
+  IStore,
+  useNovuContext,
+  ColorScheme,
+  IUserPreferenceSettings,
+} from '@novu/notification-center';
+import type { INovuThemeProvider, INotificationCenterStyles } from '@novu/notification-center';
+import { IMessage, IOrganizationEntity, ButtonTypeEnum, isBrowser } from '@novu/shared';
 
+import { API_URL, WS_URL } from '../../config';
+
+const DEFAULT_FONT_FAMILY = 'inherit';
 interface INotificationCenterWidgetProps {
   onUrlChange: (url: string) => void;
   onNotificationClick: (notification: IMessage) => void;
@@ -19,58 +30,104 @@ export function NotificationCenterWidget(props: INotificationCenterWidgetProps) 
   const [backendUrl, setBackendUrl] = useState(API_URL);
   const [socketUrl, setSocketUrl] = useState(WS_URL);
   const [theme, setTheme] = useState<INovuThemeProvider>({});
-  const [fontFamily, setFontFamily] = useState<string>('Lato');
+  const [fontFamily, setFontFamily] = useState<string>(DEFAULT_FONT_FAMILY);
   const [frameInitialized, setFrameInitialized] = useState(false);
+  const [i18n, setI18n] = useState<ITranslationEntry>();
+  const [tabs, setTabs] = useState<ITab[]>();
+  const [stores, setStores] = useState<IStore[]>();
+  const [styles, setStyles] = useState<INotificationCenterStyles>();
+  const [colorScheme, setColorScheme] = useState<ColorScheme>('light');
+  const [doLogout, setDoLogout] = useState(false);
+  const [preferenceFilter, setPreferenceFilter] = useState<(userPreference: IUserPreferenceSettings) => boolean>();
+  const [showUserPreferences, setShowUserPreferences] = useState<boolean>(true);
 
   useEffect(() => {
-    WebFont.load({
-      google: {
-        families: [fontFamily],
-      },
-    });
+    if (fontFamily !== DEFAULT_FONT_FAMILY) {
+      WebFont.load({
+        google: {
+          families: [fontFamily],
+        },
+      });
+    }
   }, [fontFamily]);
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handler = async (event: { data: any }) => {
-      if (event.data.type === 'INIT_IFRAME') {
-        setUserDataPayload(event.data.value.data);
+    const handler = ({ data }: any) => {
+      if (!data) return;
 
-        if (event.data.value.backendUrl) {
-          setBackendUrl(event.data.value.backendUrl);
+      if (data.type === 'INIT_IFRAME') {
+        setUserDataPayload(data.value.data);
+
+        if (data.value.backendUrl) {
+          setBackendUrl(data.value.backendUrl);
         }
 
-        if (event.data.value.socketUrl) {
-          setSocketUrl(event.data.value.socketUrl);
+        if (data.value.socketUrl) {
+          setSocketUrl(data.value.socketUrl);
         }
 
-        if (event.data.value.theme) {
-          setTheme(event.data.value.theme);
+        if (data.value.theme) {
+          setTheme(data.value.theme);
+        }
+
+        if (data.value.i18n) {
+          setI18n(data.value.i18n);
+        }
+
+        if (data.value.tabs) {
+          setTabs(data.value.tabs);
+        }
+
+        if (data.value.stores) {
+          setStores(data.value.stores);
+        }
+
+        if (data.value.styles) {
+          setStyles(data.value.styles);
+        }
+
+        if (data.value.colorScheme) {
+          setColorScheme(data.value.colorScheme);
+        }
+
+        if (data.value.preferenceFilter) {
+          setPreferenceFilter(() => data.value.preferenceFilter);
+        }
+
+        if (data.value.showUserPreferences) {
+          setShowUserPreferences(data.value.showUserPreferences);
         }
 
         setFrameInitialized(true);
       }
+
+      if (data.type === 'LOGOUT') {
+        setDoLogout(true);
+      }
     };
 
-    if (process.env.NODE_ENV === 'test') {
+    if (process.env.NODE_ENV === 'test' || (isBrowser() && (window as any).Cypress)) {
       // eslint-disable-next-line
       (window as any).initHandler = handler;
     }
 
     window.addEventListener('message', handler);
 
+    window.parent.postMessage({ type: 'WIDGET_READY' }, '*');
+
     return () => window.removeEventListener('message', handler);
   }, []);
 
   function onLoad({ organization }: { organization: IOrganizationEntity }) {
-    setFontFamily(organization?.branding?.fontFamily || 'Lato');
+    setFontFamily(organization?.branding?.fontFamily || DEFAULT_FONT_FAMILY);
   }
 
   if (!userDataPayload) return null;
 
   return (
     <>
-      <GlobalStyle fontFamily={fontFamily} />
+      <Global styles={globalStyle(fontFamily)} />
       {frameInitialized && (
         <NovuProvider
           backendUrl={backendUrl}
@@ -79,25 +136,53 @@ export function NotificationCenterWidget(props: INotificationCenterWidgetProps) 
           subscriberId={userDataPayload.subscriberId}
           onLoad={onLoad}
           subscriberHash={userDataPayload.subscriberHash}
+          i18n={i18n}
+          stores={stores}
+          styles={styles}
         >
-          <NotificationCenter
-            colorScheme="light"
-            onNotificationClick={props.onNotificationClick}
-            onUrlChange={props.onUrlChange}
-            onUnseenCountChanged={props.onUnseenCountChanged}
-            onActionClick={props.onActionClick}
-            theme={theme}
-          />
+          <NovuNotificationCenterWrapper doLogout={doLogout} setDoLogout={setDoLogout}>
+            <NotificationCenter
+              colorScheme={colorScheme}
+              onNotificationClick={props.onNotificationClick}
+              onUrlChange={props.onUrlChange}
+              onUnseenCountChanged={props.onUnseenCountChanged}
+              onActionClick={props.onActionClick}
+              preferenceFilter={preferenceFilter}
+              theme={theme}
+              tabs={tabs}
+              showUserPreferences={showUserPreferences}
+            />
+          </NovuNotificationCenterWrapper>
         </NovuProvider>
       )}
     </>
   );
 }
 
-const GlobalStyle = createGlobalStyle<{ fontFamily: string }>`
+function NovuNotificationCenterWrapper({
+  children,
+  doLogout,
+  setDoLogout,
+}: {
+  children: ReactNode;
+  doLogout: boolean;
+  setDoLogout: (val: boolean) => void;
+}) {
+  const { logout } = useNovuContext();
+  useEffect(() => {
+    if (doLogout) {
+      logout();
+      setDoLogout(false);
+    }
+  }, [doLogout, setDoLogout]);
+
+  return <>{children}</>;
+}
+
+const globalStyle = (fontFamily: string) => css`
   body {
     margin: 0;
-    font-family: ${({ fontFamily }) => fontFamily}, Helvetica, sans-serif;
+    font-family: ${fontFamily}, Helvetica, sans-serif;
     color: #333737;
   }
 `;

@@ -1,23 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ChannelCredentials } from '../../shared/dtos/subscriber-channel';
-import { ChatProviderIdEnum, PushProviderIdEnum } from '@novu/shared';
+import { UpdateSubscriberChannelRequestDto } from './update-subscriber-channel-request.dto';
 
-class ChannelSettings {
+class ChannelSettings extends UpdateSubscriberChannelRequestDto {
   @ApiProperty({
     description: 'Id of the integration that is used for this channel',
   })
   _integrationId: string;
-
-  @ApiProperty({
-    enum: { ...ChatProviderIdEnum, ...PushProviderIdEnum },
-    description: 'Subscriber credentials for channel',
-  })
-  providerId: ChatProviderIdEnum | PushProviderIdEnum;
-
-  @ApiProperty({
-    description: 'Subscriber credentials for channel',
-  })
-  credentials: ChannelCredentials;
 }
 
 export class SubscriberResponseDto {
@@ -28,19 +16,22 @@ export class SubscriberResponseDto {
   _id?: string;
 
   @ApiProperty()
-  firstName: string;
+  firstName?: string;
 
   @ApiProperty()
-  lastName: string;
+  lastName?: string;
 
   @ApiProperty()
-  email: string;
+  email?: string;
 
   @ApiPropertyOptional()
   phone?: string;
 
   @ApiPropertyOptional()
   avatar?: string;
+
+  @ApiPropertyOptional()
+  locale?: string;
 
   @ApiProperty({
     description:
@@ -53,6 +44,12 @@ export class SubscriberResponseDto {
     description: 'Channels settings for subscriber',
   })
   channels?: ChannelSettings[];
+
+  @ApiProperty()
+  isOnline?: boolean;
+
+  @ApiProperty()
+  lastOnlineAt?: string;
 
   @ApiProperty()
   _organizationId: string;

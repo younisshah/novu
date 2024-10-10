@@ -1,5 +1,6 @@
 import React from 'react';
-import { colors, Text, Title, Container } from '../../../design-system';
+import { colors, Text, Title, Container } from '@novu/design-system';
+import PageMeta from './PageMeta';
 
 export default function AuthContainer({
   title,
@@ -14,17 +15,18 @@ export default function AuthContainer({
 }) {
   return (
     <Container
-      size={600}
       sx={{
-        marginRight: '20%',
-        paddingTop: '5%',
-        '@media (max-width: 1500px)': {
-          marginRight: '10%',
-        },
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        margin: 0,
+        overflowY: 'auto',
+        height: '100vh',
       }}
     >
-      <div style={{ marginTop: '30px' }}>
-        <Title>{title}</Title>
+      <PageMeta title={title} />
+      <div style={{ margin: 'auto', padding: '40px 20px', width: '100%', maxWidth: 550 }}>
+        <Title data-test-id="auth-container-title">{title}</Title>
         {customDescription || (
           <Text size="lg" color={colors.B60} mb={60} mt={20}>
             {description}

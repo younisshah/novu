@@ -1,5 +1,5 @@
 import { css, Global } from '@emotion/react';
-import { colors } from '../../../design-system';
+import { colors } from '@novu/design-system';
 
 export function ActivityGraphGlobalStyles({ isTriggerSent, isDark }: { isTriggerSent: boolean; isDark: boolean }) {
   return <Global styles={chartStyles(isTriggerSent, isDark)} />;
@@ -14,7 +14,6 @@ function chartStyles(isTriggerSent: boolean, isDark: boolean) {
     }
 
     #chartjs-tooltip {
-      width: 190px;
       display: flex;
       justify-content: center;
       box-shadow: 0 5px 15px rgba(38, 68, 128, 0.05);
@@ -23,6 +22,7 @@ function chartStyles(isTriggerSent: boolean, isDark: boolean) {
       padding: 12px 15px 14px 15px;
       pointer-events: none;
       position: absolute;
+      z-index: 1;
 
       &:after {
         display: inline-block;
@@ -38,11 +38,9 @@ function chartStyles(isTriggerSent: boolean, isDark: boolean) {
 
     .tooltip-title {
       display: flex;
-
       justify-content: center;
       height: 17px;
       margin-bottom: 4px;
-      border-width: 22px;
       color: ${colors.B60};
     }
 
@@ -51,10 +49,7 @@ function chartStyles(isTriggerSent: boolean, isDark: boolean) {
       display: flex;
       justify-content: center;
       font-weight: 700;
-
       height: 17px;
-      border-width: 22px;
-
       color: #ff512f;
       background: -webkit-linear-gradient(90deg, #dd2476 0%, #ff512f 100%);
       -webkit-background-clip: text;

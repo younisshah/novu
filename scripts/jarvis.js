@@ -20,11 +20,29 @@ async function reInstallProject() {
     if (answers.reinstall === 'No') {
       return;
     }
-    await setupProject();
+
+    return await setupProject();
   });
 }
 
+const RUN_PROJECT = 'Run the project';
+const TEST_PROJECT = 'Test the project';
+
+const API_AND_WORKER_ONLY = 'API & Worker only';
+const API_TESTS = 'API tests';
+const API_E2E_TESTS = 'API E2E tests';
+const API_INTEGRATION_TESTS = 'API integration tests';
+const DEV_ENVIRONMENT_SETUP = 'Development environment setup';
+const WEB_PROJECT_AND_WIDGET = 'Web project and Widget app';
+const WEB_PROJECT = 'Web project (Web, API, Worker, WS)';
+const WEB_TESTS = 'WEB tests';
+
+const RUN_CYPRESS_UI = 'Open Cypress UI';
+const RUN_CYPRESS_CLI = 'Run Cypress tests - CLI';
+const RUN_CYPRESS_COMPONENT_CLI = 'Run Cypress Component test - CLI';
+
 async function setupRunner() {
+  const ora = require('ora');
   const shell = require('shelljs');
   const waitPort = require('wait-port');
   const inquirer = require('inquirer');
@@ -33,46 +51,61 @@ async function setupRunner() {
     {
       type: 'list',
       name: 'action',
-      message: 'How can I help today?',
-      choices: ['Run the project', 'Test the project'],
+      message: 'How can I help you today?',
+      choices: [RUN_PROJECT, TEST_PROJECT, DEV_ENVIRONMENT_SETUP],
     },
     {
       type: 'list',
       name: 'runConfiguration',
       message: 'What section of the project you want to run?',
-      choices: ['Full project', 'Web & API', 'API Only', 'Docs'],
+      choices: [WEB_PROJECT, WEB_PROJECT_AND_WIDGET, API_AND_WORKER_ONLY],
       when(answers) {
-        return answers.action === 'Run the project';
+        return answers.action === RUN_PROJECT;
       },
     },
     {
       type: 'list',
       name: 'runConfiguration',
       message: 'What section of the project you want to run?',
-      choices: ['WEB tests', 'API tests'],
+      choices: [WEB_TESTS, API_TESTS],
       when(answers) {
-        return answers.action === 'Test the project';
+        return answers.action === TEST_PROJECT;
+      },
+    },
+    {
+      type: 'list',
+      name: 'runApiConfiguration',
+      message: 'What section of the project you want to run?',
+      choices: [API_INTEGRATION_TESTS, API_E2E_TESTS],
+      when(answers) {
+        return answers.runConfiguration === API_TESTS;
       },
     },
     {
       type: 'list',
       name: 'runWebConfiguration',
       message: 'What section of the project you want to run?',
-      choices: ['Open Cypress UI', 'Run Cypress test - CLI', 'Run Cypress Component test - CLI'],
+      choices: [RUN_CYPRESS_UI, RUN_CYPRESS_CLI, RUN_CYPRESS_COMPONENT_CLI],
       when(answers) {
-        return answers.runConfiguration === 'WEB tests';
+        return answers.runConfiguration === WEB_TESTS;
       },
     },
   ];
 
   inquirer.prompt(questions).then(async (answers) => {
-    if (answers.runConfiguration === 'Full project') {
-      shell.exec('npm run nx build @novu/api');
+    if (answers.action === DEV_ENVIRONMENT_SETUP) {
+      shell.exec('npm run dev-environment-setup');
+    } else if (answers.runConfiguration === WEB_PROJECT_AND_WIDGET) {
+      shell.exec('nx run-many --target=build --projects=@novu/api,@novu/worker');
       shell.exec('npm run start:dev', { async: true });
 
       await waitPort({
         host: 'localhost',
         port: 3000,
+      });
+      await waitPort({
+        host: 'localhost',
+        port: 3004,
       });
       await waitPort({
         host: 'localhost',
@@ -85,62 +118,94 @@ async function setupRunner() {
 
       // eslint-disable-next-line no-console
       console.log(`
-Everything is running 🎊
+        Everything is running 🎊
 
-  Web: http://localhost:4200
-  API: http://localhost:3000
-    `);
-    } else if (answers.runConfiguration === 'Web & API') {
-      shell.exec('npm run nx build @novu/api');
-      shell.exec('npm run start:web', { async: true });
+        Web: http://127.0.0.1:4200
+        Widget: http://127.0.0.1:4500
+        API: http://127.0.0.1:3000
+        Worker: http://127.0.0.1:3004
+      `);
+    } else if (answers.runConfiguration === WEB_PROJECT) {
+      try {
+        shell.exec('nx run-many --target=build --projects=@novu/api,@novu/worker,@novu/ws');
 
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+        shell.exec('npm run start:api', { async: true });
+        shell.exec('npm run start:ws', { async: true });
+        shell.exec('npm run start:worker', { async: true });
+
+        await waitPort({
+          host: 'localhost',
+          port: 3000,
+        });
+        await waitPort({
+          host: 'localhost',
+          port: 3002,
+        });
+        await waitPort({
+          host: 'localhost',
+          port: 3004,
+        });
+
+        shell.exec('npm run start:web', { async: true });
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+
+        // eslint-disable-next-line no-console
+        console.log(`
+          Everything is running 🎊
+        
+          Web: http://127.0.0.1:4200
+          API: http://127.0.0.1:3000
+          WS: http://127.0.0.1:3002
+          Worker: http://127.0.0.1:3004
+        `);
+      } catch (e) {
+        console.error(`Failed to spin up the project ❌`, e);
+      }
+    } else if (answers.runConfiguration === API_AND_WORKER_ONLY) {
+      shell.exec('nx run-many --target=build --projects=@novu/api,@novu/worker');
       shell.exec('npm run start:api', { async: true });
+      shell.exec('npm run start:worker', { async: true });
 
       await waitPort({
         host: 'localhost',
         port: 3000,
       });
+      await waitPort({
+        host: 'localhost',
+        port: 3004,
+      });
+
+      console.log(`
+        Everything is running 🎊
+
+        API: http://127.0.0.1:3000
+        Worker: http://127.0.0.1:3004
+      `);
+    } else if (answers.runApiConfiguration === API_INTEGRATION_TESTS) {
+      shell.exec('nx run-many --target=build --projects=@novu/api,@novu/worker');
+      shell.exec('npm run start:worker:test', { async: true });
 
       await waitPort({
         host: 'localhost',
-        port: 4200,
+        port: 1342,
       });
 
-      // eslint-disable-next-line no-console
-      console.log(`
-Everything is running 🎊
-
-  Web: http://localhost:4200
-  API: http://localhost:3000
-    `);
-    } else if (answers.runConfiguration === 'Docs') {
-      ora('Building docs...').start();
-      shell.exec('npm run start:docs', { async: true });
+      shell.exec('npm run start:integration:api', { async: true });
+    } else if (answers.runApiConfiguration === API_E2E_TESTS) {
+      shell.exec('nx run-many --target=build --projects=@novu/api,@novu/worker');
+      shell.exec('npm run start:worker:test', { async: true });
 
       await waitPort({
         host: 'localhost',
-        port: 4040,
+        port: 1342,
       });
 
-      console.clear();
-      // eslint-disable-next-line no-console
-      console.log(`
-Everything is running 🎊
-
-  Docs: http://localhost:4040
-    `);
-    } else if (answers.runConfiguration === 'API Only') {
-      shell.exec('npm run nx build @novu/api');
-      shell.exec('npm run start:api');
-    } else if (
-      answers.runWebConfiguration === 'Open Cypress UI' ||
-      answers.runWebConfiguration === 'Run Cypress tests - CLI'
-    ) {
-      shell.exec('npm run nx build @novu/api');
-      shell.exec('npm run nx build @novu/ws');
+      shell.exec('npm run start:e2e:api', { async: true });
+    } else if ([RUN_CYPRESS_CLI, RUN_CYPRESS_UI].includes(answers.runWebConfiguration)) {
+      shell.exec('nx run-many --target=build --projects=@novu/api,@novu/worker,@novu/ws');
 
       shell.exec('npm run start:api:test', { async: true });
+      shell.exec('npm run start:worker:test', { async: true });
       shell.exec('npm run start:ws:test', { async: true });
       shell.exec('cd apps/web && npm run start', { async: true });
 
@@ -156,15 +221,20 @@ Everything is running 🎊
 
       await waitPort({
         host: 'localhost',
+        port: 1342,
+      });
+
+      await waitPort({
+        host: 'localhost',
         port: 4200,
       });
 
-      if (answers.runWebConfiguration === 'Open Cypress UI') {
+      if (answers.runWebConfiguration === RUN_CYPRESS_UI) {
         shell.exec('cd apps/web && npm run cypress:open');
-      } else if (answers.runWebConfiguration === 'Run Cypress tests - CLI') {
+      } else if (answers.runWebConfiguration === RUN_CYPRESS_CLI) {
         shell.exec('cd apps/web && npm run cypress:run');
       }
-    } else if (answers.runWebConfiguration === 'Run Cypress Component test - CLI') {
+    } else if (answers.runWebConfiguration === RUN_CYPRESS_COMPONENT_CLI) {
       shell.exec('npm run nx build @novu/web');
       shell.exec('cd apps/web && npm run cypress:run:components');
     }

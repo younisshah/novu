@@ -21,21 +21,29 @@ describe('User Preferences', function () {
         res.send({ body: res.body });
       });
     });
-    cy.initializeSession().as('session');
+    cy.initializeSession()
+      .as('session')
+      .then((session: any) => {
+        cy.wait(500);
+
+        cy.task('createNotifications', {
+          identifier: session?.templates[0]?.triggers[0]?.identifier,
+          token: session?.token,
+          subscriberId: session?.subscriber?.subscriberId,
+          count: 1,
+          organizationId: session?.organization?._id,
+          templateId: session?.templates[0]?._id,
+        });
+
+        cy.wait(1000);
+      });
   });
 
   it('should navigate between notifications and user preference screens', function () {
-    cy.task('createNotifications', {
-      identifier: this.session.templates[0].triggers[0].identifier,
-      token: this.session.token,
-      subscriberId: this.session.subscriber.subscriberId,
-      count: 1,
-    });
-
     cy.getByTestId('user-preference-cog').should('exist');
     cy.getByTestId('user-preference-cog').click();
 
-    cy.getByTestId('workflow-list-item').should('have.length', 2);
+    cy.getByTestId('workflow-list-item').should('have.length', 5);
 
     cy.getByTestId('go-back-btn').click();
     cy.getByTestId('notification-list-item').should('have.length', 1);
@@ -43,9 +51,9 @@ describe('User Preferences', function () {
 
   it.skip('should not send in app after user disables in app channel', function () {
     cy.task('createNotifications', {
-      identifier: this.session.templates[0].triggers[0].identifier,
-      token: this.session.token,
-      subscriberId: this.session.subscriber.subscriberId,
+      identifier: this.session?.templates[0]?.triggers[0]?.identifier,
+      token: this.session?.token,
+      subscriberId: this.session?.subscriber?.subscriberId,
       count: 1,
     });
 
@@ -66,9 +74,9 @@ describe('User Preferences', function () {
     });
 
     cy.task('createNotifications', {
-      identifier: this.session.templates[0].triggers[0].identifier,
-      token: this.session.token,
-      subscriberId: this.session.subscriber.subscriberId,
+      identifier: this.session?.templates[0]?.triggers[0]?.identifier,
+      token: this.session?.token,
+      subscriberId: this.session?.subscriber?.subscriberId,
       count: 1,
     });
 
@@ -85,7 +93,7 @@ describe('User Preferences', function () {
       cy.getByTestId('workflow-active-channels').should('contain', 'Email');
       cy.getByTestId('channel-preference-item').should('have.length', 3);
       cy.getByTestId('channel-preference-item-toggle').eq(0).should('be.checked');
-      cy.getByTestId('channel-preference-item-toggle').eq(0).click();
+      cy.getByTestId('channel-preference-item-toggle').eq(0).click({ force: true });
       cy.wait(1000);
 
       cy.getByTestId('channel-preference-item-toggle').eq(0).should('not.be.checked');

@@ -25,7 +25,7 @@ export class BulkInvite {
         await this.inviteMemberUsecase.execute(
           InviteMemberCommand.create({
             email: invitee.email,
-            role: invitee.role || MemberRoleEnum.MEMBER,
+            role: MemberRoleEnum.ADMIN,
             organizationId: command.organizationId,
             userId: command.userId,
           })
@@ -46,7 +46,6 @@ export class BulkInvite {
           Logger.error(e);
           Sentry.captureException(e);
           invites.push({
-            failReason: null,
             success: false,
             email: invitee.email,
           });

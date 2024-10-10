@@ -1,14 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { FeedRepository, DalException } from '@novu/dal';
+import { FeedRepository, ChangeRepository, DalException } from '@novu/dal';
+import { ChangeEntityTypeEnum } from '@novu/shared';
+
 import { DeleteFeedCommand } from './delete-feed.command';
 import { ApiException } from '../../../shared/exceptions/api.exception';
-import { CreateChange } from '../../../change/usecases/create-change.usecase';
-import { CreateChangeCommand } from '../../../change/usecases/create-change.command';
-import { ChangeEntityTypeEnum } from '@novu/shared';
+import { CreateChange, CreateChangeCommand } from '@novu/application-generic';
 
 @Injectable()
 export class DeleteFeed {
-  constructor(private feedRepository: FeedRepository, private createChange: CreateChange) {}
+  constructor(
+    private feedRepository: FeedRepository,
+    private createChange: CreateChange,
+    private changeRepository: ChangeRepository
+  ) {}
 
   async execute(command: DeleteFeedCommand) {
     try {
@@ -17,8 +21,18 @@ export class DeleteFeed {
         _organizationId: command.organizationId,
         _id: command.feedId,
       });
-      const items = await this.feedRepository.findDeleted({ _id: command.feedId });
+      const items = await this.feedRepository.findDeleted({
+        _environmentId: command.environmentId,
+        _id: command.feedId,
+      });
       const item = items[0];
+
+      const parentChangeId: string = await this.changeRepository.getChangeId(
+        command.environmentId,
+        ChangeEntityTypeEnum.FEED,
+        command.feedId
+      );
+
       await this.createChange.execute(
         CreateChangeCommand.create({
           organizationId: command.organizationId,
@@ -26,7 +40,7 @@ export class DeleteFeed {
           userId: command.userId,
           item,
           type: ChangeEntityTypeEnum.FEED,
-          changeId: FeedRepository.createObjectId(),
+          changeId: parentChangeId,
         })
       );
     } catch (e) {

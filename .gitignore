@@ -12,6 +12,8 @@ build
 coverage
 .DS_Store
 dist
+**-changes-cache.json
+
 .idea/workspace.xml
 .idea/usage.statistics.xml
 .idea/tasks.xml
@@ -23,7 +25,8 @@ dist
 .idea/**/usage.statistics.xml
 .idea/**/dictionaries
 .idea/**/shelf
-
+.idea/sonarlint
+.idea/GitLink.xml
 # Generated files
 .idea/**/contentModel.xml
 
@@ -35,6 +38,7 @@ dist
 .idea/**/dynamic.xml
 .idea/**/uiDesigner.xml
 .idea/**/dbnavigator.xml
+.idea/**/dataSources.xml
 
 # Gradle
 .idea/**/gradle.xml
@@ -98,3 +102,11 @@ docker/.env
 .vercel
 
 .pnpm-store/
+
+# NX Build System
+.nx/cache
+
+# EE Symlinked folders - we need these for the EE build
+# @TODO - find a way to remove the symlinks without breaking the build
+!enterprise/packages/**/src
+/.idea/jsLinters/eslint.xml

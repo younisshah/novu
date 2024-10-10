@@ -1,16 +1,20 @@
-import { NotificationStepDto } from './notification-template.dto';
+import { NotificationStepDto } from '../workflows';
 import { IPreferenceChannels } from '../../entities/subscriber-preference';
+import { NotificationTemplateCustomData } from '../../types';
+import { INotificationGroup } from '../../entities/notification-group';
 
 export interface ICreateNotificationTemplateDto {
   name: string;
 
   tags: string[];
 
-  description: string;
+  description?: string;
 
   steps: NotificationStepDto[];
 
-  notificationGroupId: string;
+  notificationGroupId?: string;
+
+  notificationGroup?: INotificationGroup;
 
   active?: boolean;
 
@@ -19,4 +23,8 @@ export interface ICreateNotificationTemplateDto {
   critical?: boolean;
 
   preferenceSettings?: IPreferenceChannels;
+
+  blueprintId?: string;
+
+  data?: NotificationTemplateCustomData;
 }

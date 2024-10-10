@@ -3,10 +3,14 @@ import { defineConfig } from 'cypress';
 export default defineConfig({
   chromeWebSecurity: false,
   video: false,
+  retries: {
+    runMode: 3,
+    openMode: 0,
+  },
   projectId: 'kedzap',
   env: {
     NODE_ENV: 'test',
-    API_URL: 'http://localhost:1336',
+    API_URL: 'http://127.0.0.1:1336',
   },
   e2e: {
     /*
@@ -17,7 +21,7 @@ export default defineConfig({
       // eslint-disable-next-line import/extensions
       return require('./cypress/plugins/index.ts')(on, config);
     },
-    baseUrl: 'http://localhost:3500',
+    baseUrl: 'http://127.0.0.1:3500',
     specPattern: 'cypress/e2e/**/*.{js,jsx,ts,tsx}',
   },
 });

@@ -1,17 +1,29 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import styled from '@emotion/styled';
+
 import PageHeader from '../../components/layout/components/PageHeader';
 import PageContainer from '../../components/layout/components/PageContainer';
-import { Button, colors, Tabs } from '../../design-system';
-import PageMeta from '../../components/layout/components/PageMeta';
-import styled from '@emotion/styled';
-import { useEnvironmentChanges } from '../../api/hooks/use-environment-changes';
-import { ChangesTable } from '../../components/changes/ChangesTableLayout';
-import { useMutation, useQueryClient } from 'react-query';
+import { Button, Tabs } from '@novu/design-system';
+import { useEnvController, usePromotedChanges, useUnPromotedChanges } from '../../hooks';
+import { ChangesTable } from './components/ChangesTableLayout';
 import { bulkPromoteChanges } from '../../api/changes';
 import { QueryKeys } from '../../api/query.keys';
-import { successMessage } from '../../utils/notifications';
+import { errorMessage, successMessage } from '../../utils/notifications';
+import { ROUTES } from '../../constants/routes.enum';
+
+const PENDING = 'Pending';
+const HISTORY = 'History';
 
 export function PromoteChangesPage() {
-  const { changes = [], isLoadingChanges, history, isLoadingHistory } = useEnvironmentChanges();
+  const [page, setPage] = useState<number>(0);
+  const navigate = useNavigate();
+  const { readonly } = useEnvController();
+
+  const { changes, isLoadingChanges, changesPageSize, totalChangesCount } = useUnPromotedChanges(page);
+  const { history, isLoadingHistory, historyPageSize, totalHistoryCount } = usePromotedChanges(page);
+
   const queryClient = useQueryClient();
   const { mutate, isLoading } = useMutation(bulkPromoteChanges, {
     onSuccess: () => {
@@ -20,27 +32,59 @@ export function PromoteChangesPage() {
       queryClient.refetchQueries([QueryKeys.changesCount]);
       successMessage('All changes were promoted');
     },
+    onError: (err: any) => {
+      errorMessage(err?.message || 'Something went wrong! Failed to promote changes');
+    },
   });
+
+  function handleTableChange(pageIndex) {
+    setPage(pageIndex);
+  }
+
+  if (readonly) {
+    navigate(ROUTES.HOME);
+  }
 
   const menuTabs = [
     {
-      label: 'Pending',
-      content: <ChangesTable loading={isLoadingChanges} changes={changes} />,
+      value: PENDING,
+      content: (
+        <ChangesTable
+          key={page}
+          loading={isLoadingChanges}
+          changes={changes}
+          handleTableChange={handleTableChange}
+          page={page}
+          pageSize={changesPageSize}
+          totalCount={totalChangesCount}
+          dataTestId="pending-changes-table"
+        />
+      ),
     },
     {
-      label: 'History',
-      content: <ChangesTable loading={isLoadingHistory} changes={history} />,
+      value: HISTORY,
+      content: (
+        <ChangesTable
+          key={page}
+          loading={isLoadingHistory}
+          changes={history}
+          handleTableChange={handleTableChange}
+          page={page}
+          pageSize={historyPageSize}
+          totalCount={totalHistoryCount}
+          dataTestId="history-changes-table"
+        />
+      ),
     },
   ];
 
   return (
-    <PageContainer>
-      <PageMeta title="Changes" />
+    <PageContainer title="Changes">
       <PageHeader
         title="Changes"
         actions={
           <Button
-            disabled={changes.length === 0}
+            disabled={isLoadingChanges || changes.length === 0}
             data-test-id="promote-all-btn"
             loading={isLoading}
             onClick={() => {
@@ -52,14 +96,14 @@ export function PromoteChangesPage() {
         }
       />
       <StyledTabs>
-        <Tabs menuTabs={menuTabs} />
+        <Tabs menuTabs={menuTabs} defaultValue={PENDING} onTabChange={() => setPage(0)} />
       </StyledTabs>
     </PageContainer>
   );
 }
 
 const StyledTabs = styled.div`
-  .mantine-Tabs-tabsListWrapper {
+  .mantine-Tabs-tabsList {
     margin-left: 30px;
     margin-top: 15px;
   }

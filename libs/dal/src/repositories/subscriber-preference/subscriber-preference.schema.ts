@@ -1,14 +1,14 @@
 import * as mongoose from 'mongoose';
-import { Schema, Document } from 'mongoose';
-import { schemaOptions } from '../schema-default.options';
-import { SubscriberPreferenceEntity } from './subscriber-preference.entity';
+import { Schema } from 'mongoose';
 
-const subscriberPreferenceSchema = new Schema(
+import { schemaOptions } from '../schema-default.options';
+import { PreferenceLevelEnum, SubscriberPreferenceDBModel } from './subscriber-preference.entity';
+
+const subscriberPreferenceSchema = new Schema<SubscriberPreferenceDBModel>(
   {
     _organizationId: {
       type: Schema.Types.ObjectId,
       ref: 'Organization',
-      index: true,
     },
     _environmentId: {
       type: Schema.Types.ObjectId,
@@ -18,12 +18,10 @@ const subscriberPreferenceSchema = new Schema(
     _subscriberId: {
       type: Schema.Types.ObjectId,
       ref: 'Subscriber',
-      index: true,
     },
     _templateId: {
       type: Schema.Types.ObjectId,
       ref: 'NotificationTemplate',
-      index: true,
     },
     enabled: {
       type: Schema.Types.Boolean,
@@ -46,15 +44,25 @@ const subscriberPreferenceSchema = new Schema(
         type: Schema.Types.Boolean,
       },
     },
+    level: {
+      type: Schema.Types.String,
+      enum: PreferenceLevelEnum,
+    },
   },
   schemaOptions
 );
 
-export interface ISubscriberPreferenceDocument extends SubscriberPreferenceEntity, Document {
-  _id: string;
-}
+subscriberPreferenceSchema.index({
+  _subscriberId: 1,
+  _templateId: 1,
+});
+
+subscriberPreferenceSchema.index({
+  _subscriberId: 1,
+  level: 1,
+});
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 export const SubscriberPreference =
-  mongoose.models.SubscriberPreference ||
-  mongoose.model<ISubscriberPreferenceDocument>('SubscriberPreference', subscriberPreferenceSchema);
+  (mongoose.models.SubscriberPreference as mongoose.Model<SubscriberPreferenceDBModel>) ||
+  mongoose.model<SubscriberPreferenceDBModel>('SubscriberPreference', subscriberPreferenceSchema);

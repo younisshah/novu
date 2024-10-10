@@ -1,212 +1,217 @@
-import { Grid, InputWrapper } from '@mantine/core';
-import { DigestTypeEnum, DigestUnitEnum } from '@novu/shared';
+import { Accordion, Group, useMantineColorScheme } from '@mantine/core';
 import { Controller, useFormContext } from 'react-hook-form';
-import { When } from '../../../components/utils/When';
-import { Input, Select, Switch } from '../../../design-system';
-import { inputStyles } from '../../../design-system/config/inputs.styles';
-import { useEnvController } from '../../../store/use-env-controller';
 import styled from '@emotion/styled';
+import { DigestTypeEnum } from '@novu/shared';
 
-const StyledSwitch = styled(Switch)`
-  max-width: 100% !important;
-  margin-top: 15px;
+import { When } from '../../../components/utils/When';
+import { colors, Input, Select, Tooltip, Bell, Digest, Timer } from '@novu/design-system';
+import { TypeSegmented } from './digest/TypeSegment';
+import { WillBeSentHeader } from './digest/WillBeSentHeader';
+import { RegularInfo } from './digest/icons/RegularInfo';
+import { TimedDigestMetadata } from './TimedDigestMetadata';
+import { RegularDigestMetadata } from './RegularDigestMetadata';
+import { StepSettings } from './SideBar/StepSettings';
+import { useEnvController } from '../../../hooks';
+import { useStepFormPath } from '../hooks/useStepFormPath';
+import { useTemplateEditorForm } from '../components/TemplateEditorFormProvider';
+
+const GroupStyled = styled(Group)`
+  gap: 18px;
 `;
 
-export const DigestMetadata = ({ control, index }) => {
-  const { readonly } = useEnvController();
-  const {
-    formState: { errors },
-    watch,
-  } = useFormContext();
-  const type = watch(`steps.${index}.metadata.type`);
+export const DigestMetadata = () => {
+  const { template } = useTemplateEditorForm();
+  const { readonly } = useEnvController({}, template?.chimera);
+  const stepFormPath = useStepFormPath();
+  const { control, watch } = useFormContext();
+
+  const { colorScheme } = useMantineColorScheme();
+
+  const type = watch(`${stepFormPath}.digestMetadata.type`);
+  const digestKey = watch(`${stepFormPath}.digestMetadata.digestKey`);
 
   return (
-    <>
-      <InputWrapper
-        label="Time Interval"
-        description="Once triggered, for how long the digest should collect events"
-        styles={inputStyles}
-      >
-        <Grid
-          sx={{
-            marginBottom: '2px',
-          }}
+    <div data-test-id="digest-step-settings-interval">
+      <StepSettings />
+      <Accordion mt={16} styles={{ item: { '&:last-of-type': { marginBottom: 0 } } }}>
+        <Tooltip
+          position="left"
+          width={227}
+          multiline
+          label="Types of events that will be aggregated from the previous digest to the time it will be sent"
         >
-          <Grid.Col span={4}>
-            <Controller
-              control={control}
-              name={`steps.${index}.metadata.amount`}
-              render={({ field }) => {
-                return (
-                  <Input
-                    {...field}
-                    error={errors?.steps ? errors.steps[index]?.metadata?.amount?.message : undefined}
-                    min={0}
-                    max={100}
-                    type="number"
-                    data-test-id="time-amount"
-                    placeholder="0"
-                  />
-                );
-              }}
-            />
-          </Grid.Col>
-          <Grid.Col span={8}>
-            <Controller
-              control={control}
-              name={`steps.${index}.metadata.unit`}
-              render={({ field }) => {
-                return (
-                  <Select
-                    disabled={readonly}
-                    error={errors?.steps ? errors.steps[index]?.metadata?.unit?.message : undefined}
-                    placeholder="Interval"
-                    data={[
-                      { value: DigestUnitEnum.SECONDS, label: 'Seconds' },
-                      { value: DigestUnitEnum.MINUTES, label: 'Minutes' },
-                      { value: DigestUnitEnum.HOURS, label: 'Hours' },
-                      { value: DigestUnitEnum.DAYS, label: 'Days' },
-                    ]}
-                    data-test-id="time-unit"
-                    {...field}
-                  />
-                );
-              }}
-            />
-          </Grid.Col>
-        </Grid>
-      </InputWrapper>
-      <div
-        style={{
-          marginBottom: '15px',
-        }}
-      >
-        <Controller
-          control={control}
-          defaultValue="regular"
-          name={`steps.${index}.metadata.type`}
-          render={({ field }) => {
-            return (
-              <Select
-                label="Type of digest"
-                disabled={readonly}
-                placeholder="Regular"
-                data={[
-                  { value: DigestTypeEnum.REGULAR, label: 'Regular' },
-                  { value: DigestTypeEnum.BACKOFF, label: 'Backoff' },
-                ]}
-                data-test-id="digest-type"
-                {...field}
-              />
-            );
-          }}
-        />
-      </div>
-
-      <When truthy={type === 'backoff'}>
-        <InputWrapper
-          label="Backoff Time Interval"
-          description="A digest will only be created if a message was previously sent in this time interval"
-          styles={inputStyles}
+          <Accordion.Item value="events-selection" data-test-id="digest-events-selection-options">
+            <Accordion.Control>
+              <GroupStyled>
+                <Bell color={colors.B60} />
+                <div>
+                  <div>
+                    <b
+                      style={{
+                        color: colorScheme === 'dark' ? colors.B80 : colors.B40,
+                      }}
+                    >
+                      All events
+                    </b>
+                  </div>
+                  <div>since previous digest</div>
+                </div>
+              </GroupStyled>
+            </Accordion.Control>
+            <Accordion.Panel>
+              <Select mt={-5} mb={-5} data={[{ value: 'all', label: 'All events' }]} value={'all'} />
+            </Accordion.Panel>
+          </Accordion.Item>
+        </Tooltip>
+        <Tooltip
+          position="left"
+          width={227}
+          multiline
+          label={
+            <>
+              Events aggregated by subscriberId by default, this can’t be changed. You may add additional aggregations
+              by typing the name of a variable.
+            </>
+          }
         >
-          <Grid
-            sx={{
-              marginBottom: '5px',
-            }}
-          >
-            <Grid.Col span={4}>
+          <Accordion.Item value="group-by" data-test-id="digest-group-by-options">
+            <Accordion.Control>
+              <GroupStyled>
+                <div style={{ width: 26 }}>
+                  <Digest color={colors.B60} />
+                </div>
+                <div>
+                  <div>
+                    <b>Aggregated by subscriberId</b>
+                  </div>
+                  <When truthy={!digestKey}>
+                    <div>Add another aggregation key</div>
+                  </When>
+                  <When truthy={digestKey}>
+                    <div>
+                      And by{' '}
+                      <b
+                        style={{
+                          color: colorScheme === 'dark' ? colors.B80 : colors.B40,
+                        }}
+                      >
+                        {digestKey}
+                      </b>
+                    </div>
+                  </When>
+                </div>
+              </GroupStyled>
+            </Accordion.Control>
+            <Accordion.Panel>
               <Controller
                 control={control}
-                name={`steps.${index}.metadata.backoffAmount`}
-                render={({ field }) => {
+                name={`${stepFormPath}.digestMetadata.digestKey`}
+                defaultValue=""
+                render={({ field, fieldState }) => {
                   return (
                     <Input
                       {...field}
-                      error={errors?.steps ? errors.steps[index]?.metadata?.backoffAmount?.message : undefined}
-                      min={0}
-                      max={100}
-                      type="number"
-                      data-test-id="backoff-amount"
-                      placeholder="0"
-                      required
-                    />
-                  );
-                }}
-              />
-            </Grid.Col>
-            <Grid.Col span={8}>
-              <Controller
-                control={control}
-                name={`steps.${index}.metadata.backoffUnit`}
-                render={({ field }) => {
-                  return (
-                    <Select
+                      mt={-5}
+                      mb={-5}
+                      value={field.value || ''}
+                      placeholder="Post_ID, Attribute_ID, etc."
+                      error={fieldState.error?.message}
+                      type="text"
+                      data-test-id="batch-key"
                       disabled={readonly}
-                      error={errors?.steps ? errors.steps[index]?.metadata?.backoffUnit?.message : undefined}
-                      placeholder="Interval"
-                      data={[
-                        { value: DigestUnitEnum.SECONDS, label: 'Seconds' },
-                        { value: DigestUnitEnum.MINUTES, label: 'Minutes' },
-                        { value: DigestUnitEnum.HOURS, label: 'Hours' },
-                        { value: DigestUnitEnum.DAYS, label: 'Days' },
-                      ]}
-                      data-test-id="backoff-unit"
-                      required
-                      {...field}
                     />
                   );
                 }}
               />
-            </Grid.Col>
-          </Grid>
-        </InputWrapper>
-      </When>
-      <When truthy={false}>
-        <div
-          style={{
-            marginBottom: '15px',
-          }}
-        >
-          <Controller
-            control={control}
-            name={`steps.${index}.metadata.updateMode`}
-            render={({ field: { value, ...field } }) => {
-              return (
-                <StyledSwitch
-                  {...field}
-                  data-test-id="updateMode"
-                  disabled={readonly}
-                  checked={value}
-                  label={`Update in app notifications`}
-                />
-              );
-            }}
-          />
-        </div>
-      </When>
-      <div
-        style={{
-          marginBottom: '15px',
-        }}
-      >
-        <Controller
-          control={control}
-          name={`steps.${index}.metadata.digestKey`}
-          render={({ field }) => {
-            return (
-              <Input
-                {...field}
-                label="Digest Key (Optional)"
-                placeholder="For example: post_id"
-                description="Used to group messages using this payload key, by default only subscriberId is used"
-                error={errors?.steps ? errors.steps[index]?.metadata?.digestKey?.message : undefined}
-                type="text"
-                data-test-id="batch-key"
-              />
-            );
-          }}
-        />
-      </div>
-    </>
+            </Accordion.Panel>
+          </Accordion.Item>
+        </Tooltip>
+        <Accordion.Item value="send" data-test-id="digest-send-options">
+          <Accordion.Control>
+            <GroupStyled>
+              <Timer width="30" height="30" color={colors.B60} />
+              <div>
+                <div>
+                  <b>Will be sent</b>
+                </div>
+                <div>
+                  <WillBeSentHeader path={stepFormPath} />
+                </div>
+              </div>
+            </GroupStyled>
+          </Accordion.Control>
+          <Accordion.Panel>
+            <Controller
+              control={control}
+              defaultValue={DigestTypeEnum.REGULAR}
+              name={`${stepFormPath}.digestMetadata.type`}
+              render={({ field }) => {
+                return (
+                  <TypeSegmented
+                    {...field}
+                    sx={{
+                      maxWidth: '100% !important',
+                      marginBottom: -14,
+                    }}
+                    fullWidth
+                    disabled={readonly}
+                    data={[
+                      {
+                        value: DigestTypeEnum.REGULAR,
+                        label: (
+                          <Tooltip
+                            withinPortal
+                            width={310}
+                            multiline
+                            offset={15}
+                            label={
+                              <>
+                                <div>
+                                  Digest starts after the first event occurred since the previous sent digest. From that
+                                  moment on, it aggregates events for the specified time, after which it sends a digest
+                                  of the events.
+                                </div>
+                                <RegularInfo />
+                              </>
+                            }
+                          >
+                            <div>Event</div>
+                          </Tooltip>
+                        ),
+                      },
+                      {
+                        value: DigestTypeEnum.TIMED,
+                        label: (
+                          <Tooltip
+                            withinPortal
+                            width={240}
+                            multiline
+                            offset={15}
+                            label="Digest aggregates the events in between the selected time period"
+                          >
+                            <div>Schedule</div>
+                          </Tooltip>
+                        ),
+                      },
+                    ]}
+                    data-test-id="digest-type"
+                  />
+                );
+              }}
+            />
+            <div
+              style={{
+                background: colorScheme === 'dark' ? colors.B20 : colors.BGLight,
+                padding: 16,
+                borderRadius: 8,
+              }}
+            >
+              {type === DigestTypeEnum.TIMED && <TimedDigestMetadata />}
+              {type === DigestTypeEnum.REGULAR && <RegularDigestMetadata />}
+            </div>
+          </Accordion.Panel>
+        </Accordion.Item>
+      </Accordion>
+    </div>
   );
 };

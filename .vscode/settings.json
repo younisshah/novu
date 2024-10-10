@@ -1,16 +1,35 @@
 {
-  "cSpell.userWords": [], // only use words from .cspell.json
+  "cSpell.userWords": [],
   "cSpell.enabled": true,
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
-  "npm.packageManager": "yarn",
   "editor.defaultFormatter": "dbaeumer.vscode-eslint",
   "editor.formatOnSave": true,
   "eslint.format.enable": true,
+  "editor.tabSize": 2,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "css.validate": false,
+  "editor.wordWrap": "wordWrapColumn",
+  "editor.wordWrapColumn": 120,
   "editor.codeActionsOnSave": {
-    "source.fixAll": true
+    "source.fixAll": "explicit"
   },
-  "cSpell.words": [
-    "mantine"
-  ]
+  "cSpell.words": ["mantine"],
+  "vsicons.presets.nestjs": true,
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "files.exclude": {
+    "**/.source": true
+  },
+  "search.exclude": {
+    "**/.source": true
+  }
 }

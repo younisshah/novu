@@ -1,11 +1,16 @@
 import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
-import { SharedModule } from '../shared/shared.module';
+
 import { HealthController } from './health.controller';
+import { SharedModule } from '../shared/shared.module';
+import { WSServerHealthIndicator } from '../socket/services';
+import { SocketModule } from '../socket/socket.module';
+
+const PROVIDERS = [WSServerHealthIndicator];
 
 @Module({
-  imports: [SharedModule, TerminusModule],
+  imports: [TerminusModule, SharedModule, SocketModule],
+  providers: PROVIDERS,
   controllers: [HealthController],
-  providers: [],
 })
 export class HealthModule {}

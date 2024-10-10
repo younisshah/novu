@@ -1,113 +1,168 @@
+import { ApiExtraModels, ApiProperty, ApiPropertyOptional, getSchemaPath } from '@nestjs/swagger';
 import {
-  BuilderFieldOperator,
-  BuilderFieldType,
-  BuilderGroupValues,
   DigestUnitEnum,
   DigestTypeEnum,
+  DelayTypeEnum,
+  IWorkflowStepMetadata,
+  IDigestBaseMetadata,
+  IDigestRegularMetadata,
+  IDigestTimedMetadata,
+  IDelayRegularMetadata,
+  IDelayScheduledMetadata,
+  ITimedConfig,
+  DaysEnum,
+  MonthlyTypeEnum,
+  OrdinalEnum,
+  OrdinalValueEnum,
+  StepVariantDto,
 } from '@novu/shared';
-import { MessageTemplate } from './message-template';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, ValidateNested } from 'class-validator';
 
-class NotificationStepMetadata {
+import { MessageTemplate } from './message-template';
+import { StepFilter } from './step-filter';
+
+class TimedConfig implements ITimedConfig {
   @ApiPropertyOptional()
-  amount?: number;
+  atTime?: string;
+
+  @ApiPropertyOptional({ enum: [...Object.values(DaysEnum)], isArray: true })
+  weekDays?: DaysEnum[];
+
+  @ApiPropertyOptional()
+  monthDays?: number[];
+
+  @ApiPropertyOptional({ enum: [...Object.values(OrdinalEnum)] })
+  ordinal?: OrdinalEnum;
+
+  @ApiPropertyOptional({ enum: [...Object.values(OrdinalValueEnum)] })
+  ordinalValue?: OrdinalValueEnum;
+
+  @ApiPropertyOptional({ enum: [...Object.values(MonthlyTypeEnum)] })
+  monthlyType?: MonthlyTypeEnum;
+}
+
+class AmountAndUnit {
+  @ApiPropertyOptional()
+  amount: number;
 
   @ApiPropertyOptional({
-    enum: DigestUnitEnum,
+    enum: [...Object.values(DigestUnitEnum)],
   })
-  unit?: DigestUnitEnum;
+  unit: DigestUnitEnum;
+}
 
+class DigestBaseMetadata extends AmountAndUnit implements IDigestBaseMetadata {
   @ApiPropertyOptional()
   digestKey?: string;
+}
 
-  @ApiProperty({
-    enum: DigestTypeEnum,
-  })
-  type: DigestTypeEnum;
+class DigestRegularMetadata extends DigestBaseMetadata implements IDigestRegularMetadata {
+  @ApiProperty({ enum: [DigestTypeEnum.REGULAR, DigestTypeEnum.BACKOFF] })
+  type: DigestTypeEnum.REGULAR | DigestTypeEnum.BACKOFF;
 
-  @ApiPropertyOptional({
-    enum: DigestUnitEnum,
-  })
-  backoffUnit?: DigestUnitEnum;
+  @ApiPropertyOptional()
+  backoff?: boolean;
 
   @ApiPropertyOptional()
   backoffAmount?: number;
+
+  @ApiPropertyOptional({
+    enum: [...Object.values(DigestUnitEnum)],
+  })
+  backoffUnit?: DigestUnitEnum;
 
   @ApiPropertyOptional()
   updateMode?: boolean;
 }
 
-class StepFilterChild {
-  @ApiProperty()
-  field: string;
-  @ApiProperty()
-  value: string;
+@ApiExtraModels(TimedConfig)
+class DigestTimedMetadata extends DigestBaseMetadata implements IDigestTimedMetadata {
   @ApiProperty({
-    enum: [
-      'LARGER',
-      'SMALLER',
-      'LARGER_EQUAL',
-      'SMALLER_EQUAL',
-      'EQUAL',
-      'NOT_EQUAL',
-      'ALL_IN',
-      'ANY_IN',
-      'NOT_IN',
-      'BETWEEN',
-      'NOT_BETWEEN',
-      'LIKE',
-      'NOT_LIKE',
-    ],
+    enum: [DigestTypeEnum.TIMED],
   })
-  operator: BuilderFieldOperator;
+  type: DigestTypeEnum.TIMED;
+
+  @ApiPropertyOptional()
+  @ValidateNested()
+  timed?: TimedConfig;
 }
 
-class StepFilter {
-  @ApiProperty()
-  isNegated: boolean;
-
+class DelayRegularMetadata extends AmountAndUnit implements IDelayRegularMetadata {
   @ApiProperty({
-    enum: ['BOOLEAN', 'TEXT', 'DATE', 'NUMBER', 'STATEMENT', 'LIST', 'MULTI_LIST', 'GROUP'],
+    enum: [DelayTypeEnum.REGULAR],
   })
-  type: BuilderFieldType;
-
-  @ApiProperty({
-    enum: ['AND', 'OR'],
-  })
-  value: BuilderGroupValues;
-
-  @ApiProperty({
-    type: [StepFilterChild],
-  })
-  children: StepFilterChild[];
+  type: DelayTypeEnum.REGULAR;
 }
 
-export class NotificationStep {
+class DelayScheduledMetadata implements IDelayScheduledMetadata {
+  @ApiProperty({
+    enum: [DelayTypeEnum.SCHEDULED],
+  })
+  type: DelayTypeEnum.SCHEDULED;
+
+  @ApiProperty()
+  delayPath: string;
+}
+
+@ApiExtraModels(DigestRegularMetadata, DigestTimedMetadata, DelayRegularMetadata, DelayScheduledMetadata)
+export class NotificationStepVariant implements StepVariantDto {
   @ApiPropertyOptional()
   _id?: string;
+
+  @ApiPropertyOptional()
+  uuid?: string;
+
+  @ApiPropertyOptional()
+  name?: string;
 
   @ApiPropertyOptional()
   @ApiProperty()
   _templateId?: string;
 
   @ApiPropertyOptional()
+  @IsBoolean()
   active?: boolean;
+
+  @ApiPropertyOptional()
+  shouldStopOnFail?: boolean;
 
   @ApiPropertyOptional({
     type: MessageTemplate,
   })
+  @ValidateNested()
   template?: MessageTemplate;
 
   @ApiPropertyOptional({
     type: [StepFilter],
   })
+  @ValidateNested({ each: true })
   filters?: StepFilter[];
 
   @ApiPropertyOptional()
-  _parentId?: string;
+  _parentId?: string | null;
 
   @ApiPropertyOptional({
-    type: NotificationStepMetadata,
+    oneOf: [
+      { $ref: getSchemaPath(DigestRegularMetadata) },
+      { $ref: getSchemaPath(DigestTimedMetadata) },
+      { $ref: getSchemaPath(DelayRegularMetadata) },
+      { $ref: getSchemaPath(DelayScheduledMetadata) },
+    ],
   })
-  metadata?: NotificationStepMetadata;
+  metadata?: IWorkflowStepMetadata;
+
+  @ApiPropertyOptional()
+  replyCallback?: {
+    active: boolean;
+    url: string;
+  };
+}
+
+@ApiExtraModels(DigestRegularMetadata, DigestTimedMetadata, DelayRegularMetadata, DelayScheduledMetadata)
+export class NotificationStep extends NotificationStepVariant {
+  @ApiPropertyOptional({
+    type: NotificationStepVariant,
+  })
+  @ValidateNested()
+  variants?: NotificationStepVariant[];
 }

@@ -1,9 +1,10 @@
 import * as mongoose from 'mongoose';
-import { Schema, Document } from 'mongoose';
-import { schemaOptions } from '../schema-default.options';
-import { ChangeEntity } from './change.entity';
+import { Schema } from 'mongoose';
 
-const changeSchema = new Schema(
+import { schemaOptions } from '../schema-default.options';
+import { ChangeDBModel } from './change.entity';
+
+const changeSchema = new Schema<ChangeDBModel>(
   {
     enabled: {
       type: Schema.Types.Boolean,
@@ -22,7 +23,7 @@ const changeSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'Organization',
     },
-    _entityId: Schema.Types.ObjectId,
+    _entityId: { type: Schema.Types.ObjectId, index: true },
     _creatorId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
@@ -36,10 +37,6 @@ const changeSchema = new Schema(
   { ...schemaOptions }
 );
 
-interface IChangeDocument extends ChangeEntity, Document {
-  _id: never;
-}
-
 changeSchema.virtual('user', {
   ref: 'User',
   localField: '_creatorId',
@@ -48,4 +45,5 @@ changeSchema.virtual('user', {
 });
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-export const Change = mongoose.models.Change || mongoose.model<IChangeDocument>('Change', changeSchema);
+export const Change =
+  (mongoose.models.Change as mongoose.Model<ChangeDBModel>) || mongoose.model<ChangeDBModel>('Change', changeSchema);

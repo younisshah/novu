@@ -1,21 +1,23 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { LogEntity, LogRepository } from '@novu/dal';
 import { CreateLogCommand } from './create-log.command';
+
+const LOG_CONTEXT = 'CreateLog';
 
 @Injectable()
 export class CreateLog {
   constructor(private logRepository: LogRepository) {}
 
   async execute(command: CreateLogCommand): Promise<LogEntity> {
-    let rawData: string = null;
+    let rawData: string | undefined;
     if (command.raw) {
       try {
         rawData = JSON.stringify(command.raw);
-        // eslint-disable-next-line no-empty
-      } catch (e) {}
+      } catch (error) {
+        Logger.error(error, 'Parsing raw data when creating a log failed', LOG_CONTEXT);
+      }
     }
 
-    //
     return await this.logRepository.create({
       _environmentId: command.environmentId,
       transactionId: command.transactionId,

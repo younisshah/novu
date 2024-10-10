@@ -31,6 +31,20 @@
       "type": "pwa-node"
     },
     {
+      "name": "worker",
+      "request": "launch",
+      "runtimeArgs": [
+        "run-script",
+        "start"
+      ],
+      "runtimeExecutable": "npm",
+      "cwd": "${workspaceFolder}/apps/worker",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "type": "pwa-node"
+    },
+    {
       "name": "WEB",
       "request": "launch",
       "runtimeArgs": [
@@ -67,20 +81,6 @@
       ],
       "runtimeExecutable": "npm",
       "cwd": "${workspaceFolder}/apps/widget",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
-      "type": "pwa-node"
-    },
-    {
-      "name": "DOCS",
-      "request": "launch",
-      "runtimeArgs": [
-        "run-script",
-        "start"
-      ],
-      "runtimeExecutable": "npm",
-      "cwd": "${workspaceFolder}/docs",
       "skipFiles": [
         "<node_internals>/**"
       ],
@@ -192,7 +192,7 @@
         "start:dev"
       ],
       "runtimeExecutable": "npm",
-      "cwd": "${workspaceFolder}/packages/core",
+      "cwd": "${workspaceFolder}/packages/node",
       "skipFiles": [
         "<node_internals>/**"
       ],

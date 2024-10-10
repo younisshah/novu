@@ -1,10 +1,11 @@
-import { Injectable, Scope } from '@nestjs/common';
-import { OrganizationRepository, UserRepository, MemberRepository } from '@novu/dal';
+import { Injectable, NotFoundException, Scope } from '@nestjs/common';
+import { OrganizationRepository, UserRepository, MemberRepository, IAddMemberData } from '@novu/dal';
 import { MemberRoleEnum, MemberStatusEnum } from '@novu/shared';
 import { Novu } from '@novu/node';
+import { AnalyticsService } from '@novu/application-generic';
+
 import { ApiException } from '../../../shared/exceptions/api.exception';
 import { InviteMemberCommand } from './invite-member.command';
-import { MailService } from '../../../shared/services/mail/mail.service';
 import { capitalize, createGuid } from '../../../shared/services/helper/helper.service';
 
 @Injectable({
@@ -14,7 +15,8 @@ export class InviteMember {
   constructor(
     private organizationRepository: OrganizationRepository,
     private userRepository: UserRepository,
-    private memberRepository: MemberRepository
+    private memberRepository: MemberRepository,
+    private analyticsService: AnalyticsService
   ) {}
 
   async execute(command: InviteMemberCommand) {
@@ -26,12 +28,14 @@ export class InviteMember {
     if (foundInvitee) throw new ApiException('Already invited');
 
     const inviterUser = await this.userRepository.findById(command.userId);
+    if (!inviterUser) throw new NotFoundException(`Inviter ${command.userId} is not found`);
 
     const token = createGuid();
 
-    if (process.env.NOVU_API_KEY && (process.env.NODE_ENV === 'dev' || process.env.NODE_ENV === 'prod')) {
+    if (process.env.NOVU_API_KEY && (process.env.NODE_ENV === 'dev' || process.env.NODE_ENV === 'production')) {
       const novu = new Novu(process.env.NOVU_API_KEY);
 
+      // cspell:disable-next
       await novu.trigger(process.env.NOVU_TEMPLATEID_INVITE_TO_ORGANISATION || 'invite-to-organization-wBnO8NpDn', {
         to: {
           subscriberId: command.email,
@@ -41,14 +45,14 @@ export class InviteMember {
           email: command.email,
           inviteeName: capitalize(command.email.split('@')[0]),
           organizationName: capitalize(organization.name),
-          inviterName: capitalize(inviterUser.firstName),
+          inviterName: capitalize(inviterUser.firstName ?? ''),
           acceptInviteUrl: `${process.env.FRONT_BASE_URL}/auth/invitation/${token}`,
         },
       });
     }
 
-    await this.memberRepository.addMember(organization._id, {
-      roles: [command.role],
+    const memberPayload: IAddMemberData = {
+      roles: [command.role as MemberRoleEnum],
       memberStatus: MemberStatusEnum.INVITED,
       invite: {
         token,
@@ -56,6 +60,13 @@ export class InviteMember {
         email: command.email,
         invitationDate: new Date(),
       },
+    };
+
+    this.analyticsService.track('Invite Organization Member', command.userId, {
+      _organization: command.organizationId,
+      role: command.role,
     });
+
+    await this.memberRepository.addMember(organization._id, memberPayload);
   }
 }

@@ -1,51 +1,31 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { IMessage, ChannelCTATypeEnum } from '@novu/shared';
-import { useNotifications, useApi, useNotificationCenter, useUnseenCount } from '../../../hooks';
-import image from '../../../images/no-new-notifications.png';
+
+import { useNotifications, useNotificationCenter, useNovuContext, useTranslations } from '../../../hooks';
 import { NotificationsList } from './NotificationsList';
-import { ITab } from '../../../index';
+import { Loader } from './Loader';
+import { colors } from '../../../shared/config/colors';
+import { NoNewNotifications } from '../../../images/NoNewNotifications';
 
-export function NotificationsListTab({ tab }: { tab?: ITab }) {
-  const { api } = useApi();
-  const { onNotificationClick, onUrlChange } = useNotificationCenter();
-
-  const storeId = tab?.storeId || 'default_store';
-  const {
-    markAsSeen: markNotificationAsSeen,
-    fetchNextPage,
-    refetch,
-    notifications: data,
-    fetching: isLoading,
-    hasNextPage,
-  } = useNotifications({ storeId: storeId });
-
-  const { unseenCount } = useUnseenCount();
-
-  useEffect(() => {
-    if (!isNaN(unseenCount)) {
-      refetch();
-    }
-  }, [unseenCount]);
-
-  useEffect(() => {
-    if (!data) {
-      refetch();
-    }
-  }, []);
+export function NotificationsListTab() {
+  const { apiService } = useNovuContext();
+  const { onNotificationClick, onUrlChange, emptyState } = useNotificationCenter();
+  const { notifications, isLoading, hasNextPage, markNotificationAsRead, fetchNextPage } = useNotifications();
+  const { t } = useTranslations();
 
   async function fetchNext() {
     await fetchNextPage();
   }
 
   async function onNotificationClicked(notification: IMessage) {
-    await markNotificationAsSeen(notification._id);
+    markNotificationAsRead(notification._id);
 
     if (onNotificationClick) {
       onNotificationClick(notification);
     }
     const hasCta = notification.cta?.type === ChannelCTATypeEnum.REDIRECT && notification.cta?.data?.url;
 
-    api.postUsageLog('Notification Click', {
+    apiService.postUsageLog('Notification Click', {
       notificationId: notification._id,
       hasCta,
     });
@@ -53,28 +33,36 @@ export function NotificationsListTab({ tab }: { tab?: ITab }) {
     if (hasCta && notification.cta?.data?.url && onUrlChange) {
       onUrlChange(notification.cta.data.url);
     }
-
-    refetch();
   }
 
-  return (
+  return isLoading ? (
+    <Loader />
+  ) : (
     <>
-      {!isLoading && data?.length === 0 ? (
-        <div
-          style={{
-            textAlign: 'center',
-            minHeight: 350,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <img src={image as any} alt="logo" style={{ maxWidth: 200 }} />
-        </div>
+      {!isLoading && notifications?.length === 0 ? (
+        <>
+          {emptyState ? (
+            emptyState
+          ) : (
+            <div
+              style={{
+                textAlign: 'center',
+                flexDirection: 'column',
+                minHeight: 350,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <NoNewNotifications style={{ maxWidth: 200, marginBottom: 15 }} />
+              <span style={{ color: colors.B70, fontSize: 15 }}>{t('noNewNotification')}</span>
+            </div>
+          )}
+        </>
       ) : (
         <NotificationsList
           onNotificationClicked={onNotificationClicked}
-          notifications={data || []}
+          notifications={notifications || []}
           onFetch={fetchNext}
           hasNextPage={hasNextPage}
         />

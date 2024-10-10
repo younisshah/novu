@@ -3,7 +3,8 @@ export interface ISubscriberJwt {
   firstName: string;
   lastName: string;
   email: string;
-  organizationId?: string;
-  environmentId?: string;
+  subscriberId: string;
+  organizationId: string;
+  environmentId: string;
   aud: 'widget_user';
 }

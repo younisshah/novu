@@ -1,13 +1,14 @@
 import styled from '@emotion/styled';
-import { BoltGradient } from '../../../design-system/icons';
-import { colors, Text } from '../../../design-system';
+import { BoltGradient, colors, Text } from '@novu/design-system';
 
 export function CardStatusBar({ active }: { active: boolean }) {
+  const iconProps = active ? { fill: colors.success } : {};
+
   return (
     <Wrapper>
       <ActiveWrapper active={active}>
-        <BoltGradient />
-        <StyledText data-test-id="card-status-bar-active">{active ? 'Active' : 'Not Active'}</StyledText>
+        <BoltGradient {...iconProps} />
+        <StyledText data-test-id="card-status-bar-active">{active ? 'Active' : 'Disabled'}</StyledText>
       </ActiveWrapper>
     </Wrapper>
   );
@@ -37,7 +38,7 @@ const ActiveWrapper = styled(SideElementBase)<{ active: boolean }>`
     `
       : `${StyledText},
       {
-      background: -webkit-linear-gradient(#DD2476, #FF512F);
+      background: ${colors.success};
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
         svg {

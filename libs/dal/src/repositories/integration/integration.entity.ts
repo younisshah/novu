@@ -1,43 +1,42 @@
-import { ChannelTypeEnum } from '@novu/shared';
+import { BuilderFieldType, BuilderGroupValues, ChannelTypeEnum, FilterParts, ICredentials } from '@novu/shared';
 
-export interface ICredentials {
-  apiKey?: string;
-  user?: string;
-  secretKey?: string;
-  domain?: string;
-  password?: string;
-  host?: string;
-  port?: string;
-  secure?: boolean;
-  region?: string;
-  accountSid?: string;
-  messageProfileId?: string;
-  token?: string;
-  from?: string;
-  senderName?: string;
-  applicationId?: string;
-  clientId?: string;
-  projectName?: string;
-}
+import type { EnvironmentId } from '../environment';
+import type { OrganizationId } from '../organization';
+import { ChangePropsValueType } from '../../types/helpers';
+import { StepFilter } from '../notification-template';
 
 export class IntegrationEntity {
-  _id?: string;
+  _id: string;
 
-  _environmentId: string;
+  _environmentId: EnvironmentId;
 
-  _organizationId: string;
+  _organizationId: OrganizationId;
 
   providerId: string;
 
   channel: ChannelTypeEnum;
 
-  credentials: ICredentials;
+  credentials: ICredentialsEntity;
 
   active: boolean;
+
+  name: string;
+
+  identifier: string;
+
+  priority: number;
+
+  primary: boolean;
 
   deleted: boolean;
 
   deletedAt: string;
 
   deletedBy: string;
+
+  conditions?: StepFilter[];
 }
+
+export type ICredentialsEntity = ICredentials;
+
+export type IntegrationDBModel = ChangePropsValueType<IntegrationEntity, '_environmentId' | '_organizationId'>;

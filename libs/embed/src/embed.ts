@@ -6,7 +6,7 @@ import iFrameResize from 'iframe-resizer';
 import * as EventTypes from './shared/eventTypes';
 import { UnmountedError, DomainVerificationError } from './shared/errors';
 import { IFRAME_URL } from './shared/resources';
-import { INovuThemeProvider } from '@novu/notification-center';
+import type { IStore, ITab, INotificationCenterStyles, ColorScheme } from '@novu/notification-center';
 
 const WEASL_WRAPPER_ID = 'novu-container';
 const IFRAME_ID = 'novu-iframe-element';
@@ -18,7 +18,17 @@ class Novu {
 
   private socketUrl?: string = '';
 
-  private theme?: INovuThemeProvider;
+  private theme?: Record<string, unknown>;
+
+  private colorScheme?: ColorScheme;
+
+  private styles?: INotificationCenterStyles;
+
+  private i18n?: Record<string, unknown>;
+
+  private tabs?: ITab[];
+
+  private stores?: IStore[];
 
   private debugMode: boolean;
 
@@ -37,6 +47,8 @@ class Novu {
   private widgetVisible = false;
 
   private listeners: { [key: string]: (data: any) => void } = {};
+
+  private showUserPreferences?: boolean;
 
   constructor(onloadFunc = function () {}) {
     this.debugMode = false;
@@ -64,6 +76,12 @@ class Novu {
       this.backendUrl = selectorOrOptions.backendUrl;
       this.socketUrl = selectorOrOptions.socketUrl;
       this.theme = selectorOrOptions.theme;
+      this.styles = selectorOrOptions.styles;
+      this.i18n = selectorOrOptions.i18n;
+      this.tabs = selectorOrOptions.tabs;
+      this.stores = selectorOrOptions.stores;
+      this.colorScheme = selectorOrOptions.colorScheme;
+      this.showUserPreferences = selectorOrOptions.showUserPreferences;
     }
 
     this.clientId = clientId;
@@ -113,29 +131,28 @@ class Novu {
     }
 
     function hideWidget() {
-      var elem = document.querySelector('.wrapper-novu-widget') as HTMLBodyElement;
+      const elem = document.querySelector('.wrapper-novu-widget') as HTMLBodyElement;
 
       if (elem) {
         elem.style.display = 'none';
       }
     }
 
-    window.addEventListener('resize', () => {
-      positionIframe();
-    });
-
-    window.addEventListener('click', (e: any) => {
-      if (document.querySelector(this.selector)?.contains(e.target)) {
-        this.widgetVisible = !this.widgetVisible;
+    function handleClick(e: MouseEvent | TouchEvent) {
+      if (document.querySelector(_scope.selector)?.contains(e.target as Node)) {
+        _scope.widgetVisible = !_scope.widgetVisible;
         positionIframe();
 
-        var elem = document.querySelector('.wrapper-novu-widget') as HTMLBodyElement;
+        const elem = document.querySelector('.wrapper-novu-widget') as HTMLBodyElement;
+        const isWidgetHidden = elem && elem.style.display === 'none';
 
-        if (elem) {
+        if (isWidgetHidden) {
           elem.style.display = 'inline-block';
+        } else {
+          hideWidget();
         }
 
-        this.iframe?.contentWindow?.postMessage(
+        _scope.iframe?.contentWindow?.postMessage(
           {
             type: EventTypes.SHOW_WIDGET,
             value: {},
@@ -145,7 +162,22 @@ class Novu {
       } else {
         hideWidget();
       }
-    });
+    }
+
+    window.addEventListener('resize', positionIframe);
+    window.addEventListener('click', handleClick);
+    window.addEventListener('touchstart', handleClick);
+  };
+
+  logout = () => {
+    if (!this.iframe) return;
+
+    this.iframe?.contentWindow?.postMessage(
+      {
+        type: EventTypes.LOGOUT,
+      },
+      '*'
+    );
   };
 
   // PRIVATE METHODS
@@ -157,7 +189,11 @@ class Novu {
 
   ensureAllowed = () => {
     if (!this.domainAllowed) {
-      throw new DomainVerificationError(`${window.location.host} is not permitted to use client ID ${this.clientId}`);
+      const hostName = window.location.host || '';
+      const clientIdType = typeof this.clientId;
+      const clientIdValue = clientIdType !== 'string' && clientIdType !== 'number' ? '' : '' + this.clientId;
+
+      throw new DomainVerificationError(`${hostName} is not permitted to use client ID ${clientIdValue}`);
     }
   };
 
@@ -193,6 +229,37 @@ class Novu {
   initializeIframe = (clientId: string, options: any) => {
     if (!document.getElementById(IFRAME_ID)) {
       const iframe = document.createElement('iframe');
+      window.addEventListener(
+        'message',
+        (event) => {
+          if (!event.target || event?.data?.type !== EventTypes.WIDGET_READY) {
+            return;
+          }
+
+          iframe?.contentWindow?.postMessage(
+            {
+              type: EventTypes.INIT_IFRAME,
+              value: {
+                clientId: this.clientId,
+                backendUrl: this.backendUrl,
+                socketUrl: this.socketUrl,
+                theme: this.theme,
+                styles: this.styles,
+                i18n: this.i18n,
+                topHost: window.location.host,
+                data: options,
+                tabs: this.tabs,
+                stores: this.stores,
+                colorScheme: this.colorScheme,
+                showUserPreferences: this.showUserPreferences,
+              },
+            },
+            '*'
+          );
+        },
+        true
+      );
+
       iframe.onload = () => {
         (iFrameResize as any).iframeResize(
           {
@@ -250,27 +317,11 @@ class Novu {
                 }
               }
             },
-            enablePublicMethods: true, // Enable methods within iframe hosted page
             heightCalculationMethod: 'max',
             widthCalculationMethod: 'max',
             sizeWidth: true,
           },
           `#${IFRAME_ID}`
-        );
-
-        this.iframe?.contentWindow?.postMessage(
-          {
-            type: EventTypes.INIT_IFRAME,
-            value: {
-              clientId: this.clientId,
-              backendUrl: this.backendUrl,
-              socketUrl: this.socketUrl,
-              theme: this.theme,
-              topHost: window.location.host,
-              data: options,
-            },
-          },
-          '*'
         );
       };
 
@@ -325,14 +376,24 @@ export default ((window: any) => {
 
   novuApi.init = novu.init;
   novuApi.on = novu.on;
+  novuApi.logout = novu.logout;
 
   if (initCall) {
     // eslint-disable-next-line prefer-spread
     novuApi[initCall[0]].apply(novuApi, initCall[1]);
 
-    const onCall = window.novu._c.find((call: string[]) => call[0] === 'on');
-    if (onCall) {
-      novuApi[onCall[0]].apply(novuApi, onCall[1]);
+    const onCalls = window.novu._c.filter((call: string[]) => call[0] === 'on');
+    if (onCalls.length) {
+      for (const onCall of onCalls) {
+        novuApi[onCall[0]].apply(novuApi, onCall[1]);
+      }
+    }
+
+    const logoutCalls = window.novu._c.filter((call: string[]) => call[0] === 'logout');
+    if (logoutCalls.length) {
+      for (const logoutCall of logoutCalls) {
+        novuApi[logoutCall[0]].apply(novuApi, logoutCall[1]);
+      }
     }
   } else {
     // eslint-disable-next-line no-param-reassign
@@ -340,6 +401,9 @@ export default ((window: any) => {
 
     // eslint-disable-next-line no-param-reassign
     (window as any).novu.on = novu.on;
+
+    // eslint-disable-next-line no-param-reassign
+    (window as any).novu.logout = novu.logout;
   }
 })(window);
 
@@ -355,9 +419,15 @@ interface IOptions {
   unseenBadgeSelector: string;
   backendUrl?: string;
   socketUrl?: string;
-  theme?: INovuThemeProvider;
+  theme?: Record<string, unknown>;
+  styles?: INotificationCenterStyles;
+  i18n?: Record<string, unknown>;
   position?: {
     top?: number | string;
     left?: number | string;
   };
+  tabs: ITab[];
+  stores: IStore[];
+  colorScheme?: ColorScheme;
+  showUserPreferences?: boolean;
 }

@@ -2,6 +2,7 @@ import {
   ChannelTypeEnum,
   IAttachmentOptions,
 } from '../template/template.interface';
+import { CheckIntegrationResponseEnum } from './provider.enum';
 
 export interface IProvider {
   id: string;
@@ -9,12 +10,22 @@ export interface IProvider {
 }
 
 export interface IEmailOptions {
-  to: string | string[];
+  to: string[];
   subject: string;
   html: string;
   from?: string;
   text?: string;
   attachments?: IAttachmentOptions[];
+  id?: string;
+  replyTo?: string;
+  cc?: string[];
+  bcc?: string[];
+  payloadDetails?: any;
+  notificationDetails?: any;
+  ipPoolName?: string;
+  customData?: Record<string, any>;
+  headers?: Record<string, string>;
+  senderName?: string;
 }
 
 export interface ISmsOptions {
@@ -22,6 +33,8 @@ export interface ISmsOptions {
   content: string;
   from?: string;
   attachments?: IAttachmentOptions[];
+  id?: string;
+  customData?: Record<string, any>;
 }
 export interface IPushOptions {
   target: string[];
@@ -29,10 +42,12 @@ export interface IPushOptions {
   content: string;
   payload: object;
   overrides?: {
+    type?: 'notification' | 'data';
+    data?: { [key: string]: string };
     tag?: string;
     body?: string;
     icon?: string;
-    badge?: string;
+    badge?: number;
     color?: string;
     sound?: string;
     title?: string;
@@ -41,12 +56,45 @@ export interface IPushOptions {
     clickAction?: string;
     titleLocKey?: string;
     titleLocArgs?: string;
+    ttl?: number;
+    expiration?: number;
+    priority?: 'default' | 'normal' | 'high';
+    subtitle?: string;
+    channelId?: string;
+    categoryId?: string;
+    mutableContent?: boolean;
+    android?: { [key: string]: { [key: string]: string } | string };
+    apns?: {
+      headers?: { [key: string]: string };
+      payload: {
+        aps: { [key: string]: { [key: string]: string } | string };
+      };
+    };
+    fcmOptions?: { analyticsLabel?: string };
+  };
+  subscriber: object;
+  step: {
+    digest: boolean;
+    events: object[] | undefined;
+    total_count: number | undefined;
   };
 }
 
 export interface IChatOptions {
-  webhookUrl: string;
+  phoneNumber?: string;
+  webhookUrl?: string;
+  channel?: string;
   content: string;
+  blocks?: IBlock[];
+  customData?: Record<string, any>;
+}
+
+export interface IBlock {
+  type: 'section' | 'header';
+  text: {
+    type: 'mrkdwn';
+    text: string;
+  };
 }
 
 export interface ISendMessageSuccessResponse {
@@ -55,16 +103,78 @@ export interface ISendMessageSuccessResponse {
   date?: string;
 }
 
+export enum EmailEventStatusEnum {
+  OPENED = 'opened',
+  REJECTED = 'rejected',
+  SENT = 'sent',
+  DEFERRED = 'deferred',
+  DELIVERED = 'delivered',
+  BOUNCED = 'bounced',
+  DROPPED = 'dropped',
+  CLICKED = 'clicked',
+  BLOCKED = 'blocked',
+  SPAM = 'spam',
+  UNSUBSCRIBED = 'unsubscribed',
+  DELAYED = 'delayed',
+  COMPLAINT = 'complaint',
+}
+
+export enum SmsEventStatusEnum {
+  CREATED = 'created',
+  DELIVERED = 'delivered',
+  ACCEPTED = 'accepted',
+  QUEUED = 'queued',
+  SENDING = 'sending',
+  SENT = 'sent',
+  FAILED = 'failed',
+  UNDELIVERED = 'undelivered',
+  REJECTED = 'rejected',
+}
+
+export interface IEventBody {
+  status: EmailEventStatusEnum | SmsEventStatusEnum;
+  date: string;
+  externalId?: string;
+  attempts?: number;
+  response?: string;
+  // Contains the raw content from the provider webhook
+  row?: string;
+}
+
+export interface IEmailEventBody extends IEventBody {
+  status: EmailEventStatusEnum;
+}
+
+export interface ISMSEventBody extends IEventBody {
+  status: SmsEventStatusEnum;
+}
+
 export interface IEmailProvider extends IProvider {
   channelType: ChannelTypeEnum.EMAIL;
 
   sendMessage(options: IEmailOptions): Promise<ISendMessageSuccessResponse>;
+
+  getMessageId?: (body: any | any[]) => string[];
+
+  parseEventBody?: (
+    body: any | any[],
+    identifier: string
+  ) => IEmailEventBody | undefined;
+
+  checkIntegration(options: IEmailOptions): Promise<ICheckIntegrationResponse>;
 }
 
 export interface ISmsProvider extends IProvider {
   sendMessage(options: ISmsOptions): Promise<ISendMessageSuccessResponse>;
 
   channelType: ChannelTypeEnum.SMS;
+
+  getMessageId?: (body: any) => string[];
+
+  parseEventBody?: (
+    body: any | any[],
+    identifier: string
+  ) => ISMSEventBody | undefined;
 }
 
 export interface IChatProvider extends IProvider {
@@ -76,4 +186,10 @@ export interface IPushProvider extends IProvider {
   sendMessage(options: IPushOptions): Promise<ISendMessageSuccessResponse>;
 
   channelType: ChannelTypeEnum.PUSH;
+}
+
+export interface ICheckIntegrationResponse {
+  success: boolean;
+  message: string;
+  code: CheckIntegrationResponseEnum;
 }

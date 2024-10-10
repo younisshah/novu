@@ -1,17 +1,17 @@
 {
   "name": "novu",
-  "version": "0.7.1",
+  "version": "0.24.1",
   "description": "On-Boarding Cli",
   "main": "index.js",
   "scripts": {
-    "build:post": "cross-env mkdir dist/constants/dashboard && cp-cli src/constants/dashboard/index.html dist/constants/dashboard/index.html",
-    "build:pre": "rimraf dist",
-    "build": "pnpm build:pre && tsc -p tsconfig.build.json && pnpm build:post",
-    "build:prod": "pnpm build:pre && pnpm build && pnpm build:post",
+    "build:post": "cross-env mkdir dist/constants/dashboard && ncp src/constants/dashboard/index.html dist/constants/dashboard/index.html",
+    "prebuild": "rimraf dist",
+    "build": "pnpm prebuild && tsc -p tsconfig.build.json && pnpm build:post",
+    "build:prod": "pnpm prebuild && pnpm build && pnpm build:post",
     "format": "prettier --write \"src/**/*.ts\"",
     "precommit": "lint-staged",
     "start": "pnpm start:dev",
-    "start:dev": "cross-env NODE_ENV=dev NOVU_EMBED_PATH=http://localhost:4701/embed.umd.min.js NOVU_API_ADDRESS=http://localhost:3000 NOVU_CLIENT_LOGIN=http://localhost:4200/auth/login TZ=UTC nodemon init",
+    "start:dev": "cross-env NODE_ENV=dev NOVU_EMBED_PATH=http://127.0.0.1:4701/embed.umd.min.js NOVU_API_ADDRESS=http://127.0.0.1:3000 NOVU_CLIENT_LOGIN=http://127.0.0.1:4200/auth/login CLI_SEGMENT_WRITE_KEY=GdQ594CEBj4pU6RFldDOjKJwZjxZOsIj TZ=UTC nodemon init",
     "start:test": "cross-env NODE_ENV=test PORT=1336 TZ=UTC nodemon init",
     "start:debug": "cross-env TZ=UTC nodemon --config nodemon-debug.json",
     "start:prod": "cross-env TZ=UTC node dist/index.js"
@@ -24,24 +24,26 @@
   "devDependencies": {
     "@types/configstore": "^5.0.1",
     "@types/inquirer": "^8.2.0",
-    "@types/mocha": "9.1.1",
-    "nodemon": "^2.0.15",
-    "typescript": "^4.5.5"
+    "@types/mocha": "10.0.2",
+    "ncp": "^2.0.0",
+    "nodemon": "^3.0.1",
+    "typescript": "4.9.5"
   },
   "dependencies": {
-    "@novu/shared": "^0.7.1",
-    "axios": "^0.25.0",
+    "@novu/shared": "^0.24.1",
+    "@segment/analytics-node": "^1.1.4",
+    "axios": "^1.6.2",
     "chalk": "4.1.2",
     "commander": "^9.0.0",
     "configstore": "^5.0.0",
-    "cp-cli": "^2.0.0",
+    "dotenv": "^8.2.0",
     "get-port": "^5.1.1",
     "gradient-string": "^2.0.0",
     "inquirer": "^8.2.0",
     "jwt-decode": "^3.1.2",
     "open": "^8.4.0",
     "ora": "^5.4.1",
-    "ts-node": "^10.5.0"
-  },
-  "gitHead": "565e5dcbe446aadf9fe53d13100b8cb56c0b1128"
+    "ts-node": "~10.9.1",
+    "uuid": "^9.0.0"
+  }
 }

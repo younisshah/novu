@@ -1,5 +1,9 @@
-import { IsDefined, IsObject, IsOptional, IsString } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsDefined, IsObject, IsOptional, IsString, ValidateIf, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional, getSchemaPath } from '@nestjs/swagger';
+import { TriggerRecipientSubscriber, TriggerTenantContext } from '@novu/shared';
+
+import { SubscriberPayloadDto, TenantPayloadDto } from './trigger-event-request.dto';
 
 export class TriggerEventToAllRequestDto {
   @ApiProperty({
@@ -27,7 +31,9 @@ export class TriggerEventToAllRequestDto {
     description: 'This could be used to override provider specific configurations',
     example: {
       fcm: {
-        color: '#fff',
+        data: {
+          key: 'value',
+        },
       },
     },
   })
@@ -41,4 +47,34 @@ export class TriggerEventToAllRequestDto {
   @IsString()
   @IsOptional()
   transactionId?: string;
+
+  @ApiProperty({
+    description: `It is used to display the Avatar of the provided actor's subscriber id or actor object.
+    If a new actor object is provided, we will create a new subscriber in our system
+    `,
+    oneOf: [
+      { type: 'string', description: 'Unique identifier of a subscriber in your systems' },
+      { $ref: getSchemaPath(SubscriberPayloadDto) },
+    ],
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => typeof value !== 'string')
+  @ValidateNested()
+  @Type(() => SubscriberPayloadDto)
+  actor?: TriggerRecipientSubscriber;
+
+  @ApiProperty({
+    description: `It is used to specify a tenant context during trigger event.
+    If a new tenant object is provided, we will create a new tenant.
+    `,
+    oneOf: [
+      { type: 'string', description: 'Unique identifier of a tenant in your system' },
+      { $ref: getSchemaPath(TenantPayloadDto) },
+    ],
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => typeof value !== 'string')
+  @ValidateNested()
+  @Type(() => TenantPayloadDto)
+  tenant?: TriggerTenantContext;
 }

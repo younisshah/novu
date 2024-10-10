@@ -3,83 +3,138 @@ name: E2E API Tests
 # Controls when the action will run. Triggers the workflow on push or pull request
 on:
   workflow_call:
+    inputs:
+      test-e2e-affected:
+        description: 'detect if we should run e2e tests'
+        required: false
+        default: true
+        type: boolean
+      test-e2e-ee-affected:
+        description: 'detect if we should run e2e-ee tests'
+        required: false
+        default: true
+        type: boolean
+      ee:
+        description: 'use the ee version of api'
+        required: false
+        default: false
+        type: boolean
+      job-name:
+        description: 'job name [options: novu/api-ee, novu/api]'
+        required: true
+        type: string
+      slack_notification:
+        description: 'notify if e2e fail via slack'
+        required: false
+        default: false
+        type: boolean
+      environment:
+        required: false
+        default: 'Development'
+        type: string
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
+  check_submodule_token:
+    if: ${{ inputs.ee }}
+    name: Check if the secret exists or not.
+    runs-on: ubuntu-latest
+    outputs:
+      has_token: ${{ steps.secret-check.outputs.has_token }}
+    steps:
+      - name: Check if secret exists
+        id: secret-check
+        run: |
+          if [[ -n "${{ secrets.SUBMODULES_TOKEN }}" ]]; then
+            echo "::set-output name=has_token::true"
+          else
+            echo "::set-output name=has_token::false"
+          fi
+
   # This workflow contains a single job called "build"
   e2e_api:
+    name: Test E2E
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     timeout-minutes: 80
-
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      packages: write
+      deployments: write
+      id-token: write
+    needs: [check_submodule_token]
+    if: |
+      ${{ contains (inputs.job-name,'-ee') && inputs.test-e2e-ee-affected == 'true' }} ||
+      ${{ !contains (inputs.job-name,'-ee') && inputs.test-e2e-affected == 'true' }}
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v2
-    - name: Setup kernel for react native, increase watchers
-      run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
-    - uses: actions/setup-node@v2
-      with:
-        node-version: '16.15.1'
+      # checkout with submodules if token is provided
+      - uses: actions/checkout@v3
+        name: Checkout with submodules
+        if: ${{ needs.check_submodule_token.outputs.has_token == 'true' && inputs.ee }}
+        with:
+          submodules: true
+          token: ${{ secrets.SUBMODULES_TOKEN }}
 
-    - name: Start Redis
-      uses: supercharge/redis-github-action@1.2.0
+      # else checkout without submodules if the token is not provided
+      - uses: actions/checkout@v3
+        name: Checkout
+        if: ${{ needs.check_submodule_token.outputs.has_token != 'true' || !contains (inputs.job-name,'-ee') }}
 
-    - name: Start MongoDB
-      uses: supercharge/mongodb-github-action@1.3.0
-      with:
-        mongodb-version: 4.2.8
+      - uses: ./.github/actions/setup-project
+        name: Setup project
+        with:
+          submodules: ${{ inputs.ee && needs.check_submodule_token.outputs.has_token == 'true' }}
 
-    - name: Cache pnpm modules
-      uses: actions/cache@v2
-      with:
-        path: ~/.pnpm-store
-        key: ${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-
+      - uses: ./.github/actions/setup-redis-cluster
+        name: Setup redis cluster
 
-    - uses: pnpm/action-setup@v2.0.1
-      with:
-        version: 7.5.0
-        run_install: true
+      - uses: ./.github/actions/start-localstack
+        name: Start localstack
 
-    - uses: mansagroup/nrwl-nx-action@v2
-      with:
-        targets: lint
-        projects: "@novu/api"
 
-    - name: Start Local Stack
-      env:
-        AWS_DEFAULT_REGION: us-east-1
-        DEFAULT_REGION: us-east-1
-        AWS_ACCOUNT_ID: "000000000000"
-        AWS_ACCESS_KEY_ID: test
-        AWS_SECRET_ACCESS_KEY: test
-        AWS_EC2_METADATA_DISABLED: true
-      working-directory: environment/test
-      run: |
-        docker-compose up -d
-        sleep 10
-        max_retry=30
-        counter=0
-        until $command
-        do
-          sleep 1
-          [[ counter -eq $max_retry ]] && echo "Failed!" && exit 1
-          aws --endpoint-url=http://localhost:4566 s3 ls
-          echo "Trying again. Try #$counter"
-          ((counter++))
-        done
-        docker-compose logs --tail="all"
-        aws --endpoint-url=http://localhost:4566 --cli-connect-timeout 600 s3 mb s3://novu-test
+      - uses: ./.github/actions/run-worker
+        name: Run worker
+        with:
+          launch_darkly_sdk_key: ${{ secrets.LAUNCH_DARKLY_SDK_KEY }}
+          ee: ${{ needs.check_submodule_token.outputs.has_token == 'true' && inputs.ee }}
 
-      # Runs a single command using the runners shell
-    - name: Build API
-      run: CI='' pnpm build:api
+        # Runs a single command using the runners shell
+      - name: Build API
+        run: CI='' pnpm build:api --skip-nx-cache
 
-    # Runs a set of commands using the runners shell
-    - name: Run a test
-      run: |
-        cd apps/api && pnpm test:e2e
-        pnpm test
+      - name: Run E2E tests
+        env:
+          LAUNCH_DARKLY_SDK_KEY: ${{ secrets.LAUNCH_DARKLY_SDK_KEY }}
+        run: |
+          cd apps/api && pnpm test:e2e
 
+      - name: Run E2E EE tests
+        if: ${{ needs.check_submodule_token.outputs.has_token == 'true' && inputs.ee }}
+        env:
+          LAUNCH_DARKLY_SDK_KEY: ${{ secrets.LAUNCH_DARKLY_SDK_KEY }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          CI_EE_TEST: true
+        run: |
+          cd apps/api && pnpm test:e2e:ee
+
+      - name: Kill port for worker 1342 for unit tests
+        run: sudo kill -9 $(sudo lsof -t -i:1342)
+
+      - name: Run unit tests
+        run: |
+          cd apps/api && pnpm test
+
+      - name: Notify Slack Action
+        uses: ravsamhq/notify-slack-action@v2
+        if: ${{ always() && inputs.slack_notification }}
+        with:
+          status: ${{ job.status }}
+          notification_title: "{workflow} for API has {status_message}"
+          message_format: "{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}>"
+          footer: "Linked Run URL {run_url}\nCommit URL{commit_url}"
+          notify_when: "failure"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

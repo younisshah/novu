@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { OrganizationRepository } from '@novu/dal';
 import { OrganizationResponseDto } from '../../dtos/organization-response.dto';
 import { GetOrganizationDataCommand } from './get-organization-data.command';
@@ -8,12 +8,15 @@ export class GetOrganizationData {
   constructor(private organizationRepository: OrganizationRepository) {}
 
   async execute(command: GetOrganizationDataCommand): Promise<OrganizationResponseDto> {
-    const environment = await this.organizationRepository.findById(command.organizationId);
+    const organization = await this.organizationRepository.findById(command.organizationId);
+    if (!organization) {
+      throw new NotFoundException(`Organization with id ${command.organizationId} not found`);
+    }
 
     return {
-      _id: environment._id,
-      name: environment.name,
-      branding: environment.branding,
+      _id: organization._id,
+      name: organization.name,
+      branding: organization.branding,
     };
   }
 }

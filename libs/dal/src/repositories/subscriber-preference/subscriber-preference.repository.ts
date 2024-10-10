@@ -1,8 +1,13 @@
 import { BaseRepository } from '../base-repository';
-import { SubscriberPreferenceEntity } from './subscriber-preference.entity';
+import type { EnforceEnvOrOrgIds } from '../../types/enforce';
+import { SubscriberPreferenceEntity, SubscriberPreferenceDBModel } from './subscriber-preference.entity';
 import { SubscriberPreference } from './subscriber-preference.schema';
 
-export class SubscriberPreferenceRepository extends BaseRepository<SubscriberPreferenceEntity> {
+export class SubscriberPreferenceRepository extends BaseRepository<
+  SubscriberPreferenceDBModel,
+  SubscriberPreferenceEntity,
+  EnforceEnvOrOrgIds
+> {
   constructor() {
     super(SubscriberPreference, SubscriberPreferenceEntity);
   }
@@ -13,6 +18,7 @@ export class SubscriberPreferenceRepository extends BaseRepository<SubscriberPre
     templatesIds: string[]
   ): Promise<SubscriberPreferenceEntity[]> {
     return await this.find({
+      _environmentId: environmentId,
       _subscriberId: subscriberId,
       _templateId: {
         $in: templatesIds,

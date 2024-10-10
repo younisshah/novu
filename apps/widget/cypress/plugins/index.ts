@@ -25,36 +25,58 @@ module.exports = (on, config) => {
   });
 
   on('task', {
-    async createNotifications({ identifier, token, subscriberId, count = 1 }) {
+    async createNotifications({
+      identifier,
+      templateId,
+      token,
+      subscriberId,
+      count = 1,
+      organizationId,
+      enumerate = false,
+      ordered = false,
+    }) {
       const triggerIdentifier = identifier;
       const service = new NotificationsService(token);
+      const session = new UserSession(config.env.API_URL);
 
       // eslint-disable-next-line no-plusplus
       for (let i = 0; i < count; i++) {
+        const num = enumerate ? ` ${i}` : '';
         await service.triggerEvent(triggerIdentifier, subscriberId, {
-          firstName: 'John',
+          firstName: `John${num}`,
         });
+        if (ordered) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }
+
+      if (organizationId) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        await session.awaitRunningJobs(templateId, undefined, 0, organizationId);
       }
 
       return 'ok';
     },
+
     async clearDatabase() {
       const dal = new DalService();
-      await dal.connect('mongodb://localhost:27017/novu-test');
+      await dal.connect('mongodb://127.0.0.1:27017/novu-test');
       await dal.destroy();
       return true;
     },
+
     async seedDatabase() {
       const dal = new DalService();
-      await dal.connect('mongodb://localhost:27017/novu-test');
+      await dal.connect('mongodb://127.0.0.1:27017/novu-test');
 
       const session = new UserSession(config.env.API_URL);
 
       return true;
     },
-    async getSession(settings: { noEnvironment?: boolean } = {}) {
+
+    async getSession({ settings, templateOverride }) {
       const dal = new DalService();
-      await dal.connect('mongodb://localhost:27017/novu-test');
+      await dal.connect('mongodb://127.0.0.1:27017/novu-test');
 
       const session = new UserSession(config.env.API_URL);
       await session.initialize({
@@ -70,15 +92,15 @@ module.exports = (on, config) => {
       let templates;
       if (!settings?.noEnvironment) {
         templates = await Promise.all([
-          notificationTemplateService.createTemplate(),
+          notificationTemplateService.createTemplate(templateOverride),
           notificationTemplateService.createTemplate({
             active: false,
             draft: true,
           }),
-          notificationTemplateService.createTemplate(),
-          notificationTemplateService.createTemplate(),
-          notificationTemplateService.createTemplate(),
-          notificationTemplateService.createTemplate(),
+          notificationTemplateService.createTemplate(templateOverride),
+          notificationTemplateService.createTemplate(templateOverride),
+          notificationTemplateService.createTemplate(templateOverride),
+          notificationTemplateService.createTemplate(templateOverride),
         ]);
       }
 
@@ -89,9 +111,9 @@ module.exports = (on, config) => {
         environment: session.environment,
         identifier: session.environment.identifier,
         templates,
-        session,
       };
     },
+
     async enableEnvironmentHmac({
       environment,
     }: {

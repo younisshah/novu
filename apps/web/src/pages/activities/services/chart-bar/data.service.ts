@@ -1,9 +1,9 @@
 import * as cloneDeep from 'lodash.clonedeep';
-import moment from 'moment';
 import { ScriptableContext } from 'chart.js';
+import { format, subDays } from 'date-fns';
 import { IActivityGraphStats, IChartData } from '../../interfaces';
 import { activityGraphStatsMock } from '../../consts';
-import { colors } from '../../../../design-system';
+import { colors } from '@novu/design-system';
 
 export function getChartData(data: IActivityGraphStats[] | undefined, isDark: boolean): IChartData {
   if (!data || data?.length === 0) {
@@ -17,15 +17,18 @@ export function getChartData(data: IActivityGraphStats[] | undefined, isDark: bo
   return buildChartDataContainer(data, isDark);
 }
 
-function buildChartDataContainer(data: IActivityGraphStats[], isDark: boolean): IChartData {
+function buildChartDataContainer(data: IActivityGraphStats[], isDark: boolean): any {
   return {
-    labels: buildChartDateLabels(data),
     datasets: [
       {
         backgroundColor: isDark ? colors.B20 : colors.BGLight,
         hoverBackgroundColor: createGradientColor(),
         data: buildChartData(data),
         borderRadius: 7,
+        parsing: {
+          xAxisKey: 'dateLabel',
+          yAxisKey: 'count',
+        },
       },
     ],
   };
@@ -36,25 +39,22 @@ function fillWeekData(data: IActivityGraphStats[]) {
   // eslint-disable-next-line no-plusplus
   for (let i = data.length - 1; i < 6; i++) {
     const earliestDate = fullWeekData[i]._id;
-    const newDate = moment(earliestDate, 'YYYY-MM-DD').subtract(1, 'days').format('YYYY-MM-DD');
+    const newDate = format(subDays(new Date(earliestDate), 1), 'yyyy-MM-dd');
 
-    fullWeekData.push({ _id: newDate, count: 0 });
+    fullWeekData.push({ _id: newDate, count: 0, templates: [], channels: [] });
   }
 
   return fullWeekData;
 }
 
-function buildChartDateLabels(data: IActivityGraphStats[]): string[][] {
+function buildChartData(data: IActivityGraphStats[]): Array<IActivityGraphStats & { dateLabel: string }> {
   return data.map((item) => {
-    const titleDate = moment(item._id);
+    const titleDate = new Date(item._id);
 
-    return [titleDate.format('ddd'), `${titleDate.date()}/${titleDate.month() + 1}`];
-  });
-}
-
-function buildChartData(data: IActivityGraphStats[]) {
-  return data.map((item) => {
-    return item.count;
+    return {
+      ...item,
+      dateLabel: `${format(titleDate, 'EEE')} ${format(titleDate, 'dd')}/${format(titleDate, 'MM')}`,
+    };
   });
 }
 

@@ -9,10 +9,9 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { IJwtPayload, MemberRoleEnum } from '@novu/shared';
-import { Roles } from '../auth/framework/roles.decorator';
+import { IJwtPayload } from '@novu/shared';
 import { UserSession } from '../shared/framework/user.decorator';
-import { JwtAuthGuard } from '../auth/framework/auth.guard';
+import { UserAuthGuard } from '../auth/framework/user.auth.guard';
 import { CreateFeed } from './usecases/create-feed/create-feed.usecase';
 import { CreateFeedCommand } from './usecases/create-feed/create-feed.command';
 import { CreateFeedRequestDto } from './dto/create-feed-request.dto';
@@ -20,13 +19,15 @@ import { GetFeeds } from './usecases/get-feeds/get-feeds.usecase';
 import { GetFeedsCommand } from './usecases/get-feeds/get-feeds.command';
 import { DeleteFeed } from './usecases/delete-feed/delete-feed.usecase';
 import { DeleteFeedCommand } from './usecases/delete-feed/delete-feed.command';
-import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FeedResponseDto } from './dto/feed-response.dto';
 import { ExternalApiAccessible } from '../auth/framework/external-api.decorator';
+import { ApiCommonResponses, ApiResponse } from '../shared/framework/response.decorator';
 
+@ApiCommonResponses()
 @Controller('/feeds')
 @UseInterceptors(ClassSerializerInterceptor)
-@UseGuards(JwtAuthGuard)
+@UseGuards(UserAuthGuard)
 @ApiTags('Feeds')
 export class FeedsController {
   constructor(
@@ -36,9 +37,7 @@ export class FeedsController {
   ) {}
 
   @Post('')
-  @ApiCreatedResponse({
-    type: FeedResponseDto,
-  })
+  @ApiResponse(FeedResponseDto, 201)
   @ApiOperation({
     summary: 'Create feed',
   })
@@ -55,9 +54,7 @@ export class FeedsController {
   }
 
   @Get('')
-  @ApiOkResponse({
-    type: [FeedResponseDto],
-  })
+  @ApiResponse(FeedResponseDto, 200, true)
   @ApiOperation({
     summary: 'Get feeds',
   })
@@ -73,9 +70,7 @@ export class FeedsController {
   }
 
   @Delete('/:feedId')
-  @ApiOkResponse({
-    type: [FeedResponseDto],
-  })
+  @ApiResponse(FeedResponseDto, 200, true)
   @ApiOperation({
     summary: 'Delete feed',
   })

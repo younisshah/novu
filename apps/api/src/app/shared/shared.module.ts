@@ -1,37 +1,55 @@
 import { Module } from '@nestjs/common';
 import {
-  DalService,
-  UserRepository,
-  OrganizationRepository,
-  EnvironmentRepository,
-  NotificationTemplateRepository,
-  SubscriberRepository,
-  NotificationRepository,
-  MessageRepository,
-  NotificationGroupRepository,
-  MessageTemplateRepository,
-  MemberRepository,
-  LogRepository,
-  IntegrationRepository,
   ChangeRepository,
-  JobRepository,
+  DalService,
+  EnvironmentRepository,
+  ExecutionDetailsRepository,
   FeedRepository,
+  IntegrationRepository,
+  JobRepository,
+  LayoutRepository,
+  LogRepository,
+  MemberRepository,
+  MessageRepository,
+  MessageTemplateRepository,
+  NotificationGroupRepository,
+  NotificationRepository,
+  NotificationTemplateRepository,
+  OrganizationRepository,
   SubscriberPreferenceRepository,
+  SubscriberRepository,
+  TenantRepository,
+  TopicRepository,
+  TopicSubscribersRepository,
+  UserRepository,
+  WorkflowOverrideRepository,
 } from '@novu/dal';
-import { AnalyticsService } from './services/analytics/analytics.service';
-import { MailService } from './services/mail/mail.service';
-import { QueueService } from './services/queue';
 import {
-  AzureBlobStorageService,
-  GCSStorageService,
-  S3StorageService,
-  StorageService,
-} from './services/storage/storage.service';
+  analyticsService,
+  cacheService,
+  CacheServiceHealthIndicator,
+  CalculateDelayService,
+  createNestLoggingModuleOptions,
+  DalServiceHealthIndicator,
+  distributedLockService,
+  featureFlagsService,
+  getFeatureFlag,
+  InvalidateCacheService,
+  LoggerModule,
+  QueuesModule,
+  storageService,
+  ExecutionLogRoute,
+  CreateExecutionDetails,
+} from '@novu/application-generic';
+
+import * as packageJson from '../../../package.json';
+import { JobTopicNameEnum } from '@novu/shared';
 
 const DAL_MODELS = [
   UserRepository,
   OrganizationRepository,
   EnvironmentRepository,
+  ExecutionDetailsRepository,
   NotificationTemplateRepository,
   SubscriberRepository,
   NotificationRepository,
@@ -39,65 +57,62 @@ const DAL_MODELS = [
   MessageTemplateRepository,
   NotificationGroupRepository,
   MemberRepository,
+  LayoutRepository,
   LogRepository,
   IntegrationRepository,
   ChangeRepository,
   JobRepository,
   FeedRepository,
   SubscriberPreferenceRepository,
+  TopicRepository,
+  TopicSubscribersRepository,
+  TenantRepository,
+  WorkflowOverrideRepository,
 ];
 
-function getStorageServiceClass() {
-  switch (process.env.STORAGE_SERVICE) {
-    case 'GCS':
-      return GCSStorageService;
-    case 'AZURE':
-      return AzureBlobStorageService;
-    default:
-      return S3StorageService;
-  }
-}
+const dalService = {
+  provide: DalService,
+  useFactory: async () => {
+    const service = new DalService();
+    await service.connect(process.env.MONGO_URL);
 
-const dalService = new DalService();
-
-export const ANALYTICS_SERVICE = 'AnalyticsService';
+    return service;
+  },
+};
 
 const PROVIDERS = [
-  {
-    provide: QueueService,
-    useFactory: () => {
-      return new QueueService();
-    },
-  },
-  {
-    provide: DalService,
-    useFactory: async () => {
-      await dalService.connect(process.env.MONGO_URL);
-
-      return dalService;
-    },
-  },
+  analyticsService,
+  cacheService,
+  CacheServiceHealthIndicator,
+  CalculateDelayService,
+  dalService,
+  DalServiceHealthIndicator,
+  distributedLockService,
+  featureFlagsService,
+  InvalidateCacheService,
+  storageService,
   ...DAL_MODELS,
-  {
-    provide: StorageService,
-    useClass: getStorageServiceClass(),
-  },
-  {
-    provide: ANALYTICS_SERVICE,
-    useFactory: async () => {
-      const analyticsService = new AnalyticsService();
-
-      await analyticsService.initialize();
-
-      return analyticsService;
-    },
-  },
-  MailService,
+  ExecutionLogRoute,
+  CreateExecutionDetails,
+  getFeatureFlag,
 ];
 
 @Module({
-  imports: [],
+  imports: [
+    QueuesModule.forRoot([
+      JobTopicNameEnum.EXECUTION_LOG,
+      JobTopicNameEnum.WEB_SOCKETS,
+      JobTopicNameEnum.WORKFLOW,
+      JobTopicNameEnum.INBOUND_PARSE_MAIL,
+    ]),
+    LoggerModule.forRoot(
+      createNestLoggingModuleOptions({
+        serviceName: packageJson.name,
+        version: packageJson.version,
+      })
+    ),
+  ],
   providers: [...PROVIDERS],
-  exports: [...PROVIDERS],
+  exports: [...PROVIDERS, LoggerModule, QueuesModule],
 })
 export class SharedModule {}

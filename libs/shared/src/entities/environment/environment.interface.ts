@@ -1,3 +1,5 @@
+import { IApiRateLimitMaximum } from '../../types';
+
 export interface IEnvironment {
   _id?: string;
   name: string;
@@ -5,6 +7,8 @@ export interface IEnvironment {
   _parentId?: string;
   identifier: string;
   widget: IWidgetSettings;
+  dns?: IDnsSettings;
+  apiRateLimits?: IApiRateLimitMaximum;
 
   branding?: {
     color: string;
@@ -14,8 +18,17 @@ export interface IEnvironment {
     contentBackground: string;
     direction: 'ltr' | 'rtl';
   };
+
+  echo?: {
+    url?: string;
+  };
 }
 
 export interface IWidgetSettings {
   notificationCenterEncryption: boolean;
+}
+
+export interface IDnsSettings {
+  mxRecordConfigured: boolean;
+  inboundParseDomain: string;
 }
